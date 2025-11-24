@@ -1,0 +1,21 @@
+{
+  "documents": [
+    {
+      "id": "anthropic_commercial_terms",
+      "name": "Anthropic Commercial Terms",
+      "url": "https://www.anthropic.com/legal/commercial-terms",
+      "selector": "main"
+    }
+  ],
+  "metadata": {
+    "description": "Configuration for legal documents to monitor",
+    "last_updated": "2024-11-24T00:00:00Z",
+    "version": "1.0.0",
+    "notes": [
+      "Each document must have a unique 'id' field",
+      "The 'selector' field is optional but recommended for better content extraction",
+      "URLs should point to the canonical location of the terms/legal document",
+      "Document names should be human-readable and descriptive"
+    ]
+  }
+}

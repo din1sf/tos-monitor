@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Google Cloud credentials
+google-cloud-key.json
+service-account.json
+
+# Local environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -1,0 +1,1 @@
+"""ToS Monitor application package."""
