@@ -534,6 +534,9 @@ class CloudStorage:
             logger.info(f"No previous version found for {doc_id} or error reading: {str(e)}")
             # First time or error reading - treat as changes detected
 
+        # Handle changed file creation/removal
+        changed_file_path = f"tos/{doc_id}/changed"
+
         if changes_detected:
             # Update pointer files and create dated snapshot
             try:
@@ -556,9 +559,14 @@ class CloudStorage:
             await self.upload_file(dated_content_path, content)
             await self.upload_file(dated_metadata_path, json.dumps(metadata, indent=2), "application/json")
 
+            # Create changed file to indicate changes were detected
+            await self.upload_file(changed_file_path, timestamp)
+
             snapshot_created = True
             logger.info(f"Created ToS snapshot for {doc_id} at {timestamp} (pointer system)")
         else:
+            # Remove changed file if no changes detected
+            await self.delete_file(changed_file_path)
             logger.info(f"No changes detected for {doc_id}, keeping current only")
 
         return {
@@ -1049,6 +1057,9 @@ class LocalStorage:
             logger.info(f"No previous version found for {doc_id} or error reading: {str(e)}")
             # First time or error reading - treat as changes detected
 
+        # Handle changed file creation/removal
+        changed_file_path = f"tos/{doc_id}/changed"
+
         if changes_detected:
             # Update pointer files and create dated snapshot
             try:
@@ -1071,9 +1082,14 @@ class LocalStorage:
             await self.upload_file(dated_content_path, content)
             await self.upload_file(dated_metadata_path, json.dumps(metadata, indent=2))
 
+            # Create changed file to indicate changes were detected
+            await self.upload_file(changed_file_path, timestamp)
+
             snapshot_created = True
             logger.info(f"Created ToS snapshot for {doc_id} at {timestamp} (pointer system)")
         else:
+            # Remove changed file if no changes detected
+            await self.delete_file(changed_file_path)
             logger.info(f"No changes detected for {doc_id}, keeping current only")
 
         return {
