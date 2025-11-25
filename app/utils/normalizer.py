@@ -178,11 +178,11 @@ class TextNormalizer:
         text = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', text)
 
         # Normalize quotes
-        text = re.sub(r'["""]', '"', text)
-        text = re.sub(r'['']', "'", text)
+        text = re.sub(r'[\u201c\u201d\u201e]', '"', text)  # Smart double quotes
+        text = re.sub(r'[\u2018\u2019]', "'", text)      # Smart single quotes
 
         # Normalize dashes
-        text = re.sub(r'[–—]', '-', text)
+        text = re.sub(r'[\u2013\u2014]', '-', text)  # En dash and em dash
 
         # Remove excessive punctuation
         text = re.sub(r'\.{4,}', '...', text)
@@ -246,7 +246,7 @@ class TextNormalizer:
         text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
 
         # Standardize bullet points
-        text = re.sub(r'^[-•·▪▫‣⁃]\s*', '• ', text, flags=re.MULTILINE)
+        text = re.sub(r'^[\-\u2022\u00b7\u25aa\u25ab\u2023\u2043]\s*', '• ', text, flags=re.MULTILINE)
 
         # Standardize numbered lists
         text = re.sub(r'^\d+\.\s*', lambda m: f"{m.group().strip()} ", text, flags=re.MULTILINE)

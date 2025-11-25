@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,6 +17,8 @@ from app.routes import fetch_docs, generate_diffs, get_diffs
 from app.storage import get_storage_client
 from app.llm_client import get_llm_client
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -242,9 +245,21 @@ async def startup_event():
     """
     logger.info("Starting ToS Monitor application")
 
-    # Validate required environment variables
-    required_vars = ["STORAGE_BUCKET", "OPENAI_API_KEY"]
+    # Validate required environment variables based on storage mode
+    storage_mode = os.getenv("STORAGE_MODE", "cloud").lower()
+    required_vars = ["OPENAI_API_KEY"]
     missing_vars = []
+
+    # Add storage-specific requirements
+    if storage_mode == "cloud":
+        required_vars.append("STORAGE_BUCKET")
+    elif storage_mode == "local":
+        # For local mode, no additional vars are required
+        # LOCAL_STORAGE_PATH is optional and defaults to "./data"
+        pass
+    else:
+        logger.error(f"Invalid STORAGE_MODE '{storage_mode}'. Must be 'local' or 'cloud'")
+        raise RuntimeError(f"Invalid STORAGE_MODE '{storage_mode}'. Must be 'local' or 'cloud'")
 
     for var in required_vars:
         if not os.getenv(var):
@@ -253,6 +268,14 @@ async def startup_event():
     if missing_vars:
         logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+    logger.info(f"Using storage mode: {storage_mode}")
+    if storage_mode == "local":
+        local_path = os.getenv("LOCAL_STORAGE_PATH", "./data")
+        logger.info(f"Local storage path: {local_path}")
+    else:
+        bucket_name = os.getenv("STORAGE_BUCKET")
+        logger.info(f"Cloud storage bucket: {bucket_name}")
 
     logger.info("ToS Monitor application started successfully")
 

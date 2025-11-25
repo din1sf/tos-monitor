@@ -7,7 +7,7 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 - 🔍 **Automatic Document Monitoring**: Fetches and monitors legal documents from configured URLs
 - 📸 **Smart Snapshots**: Creates snapshots only when meaningful content changes are detected
 - 🤖 **LLM-Powered Analysis**: Generates human-readable summaries of document changes using OpenAI GPT models
-- ☁️ **Cloud-Native**: Designed for Google Cloud Run with Cloud Storage for persistence
+- ☁️ **Dual Storage**: Supports both Cloud Storage and local file storage modes
 - 🎯 **Intelligent Change Detection**: Multiple hashing strategies to distinguish between cosmetic and substantial changes
 - 📊 **RESTful API**: Clean API for fetching documents, generating diffs, and retrieving results
 - 🏗️ **Serverless Architecture**: Scales to zero when not in use, cost-effective operation
@@ -91,6 +91,37 @@ storage-bucket/
 4. **Access the API**:
    - API Documentation: http://localhost:8000/docs
    - Health Check: http://localhost:8000/health
+
+### Local Mode (No Cloud Dependencies)
+
+For local-only operation without Google Cloud Storage:
+
+1. **Set environment variables**:
+   ```bash
+   export STORAGE_MODE=local
+   export LOCAL_STORAGE_PATH=./data  # Optional, defaults to ./data
+   ```
+
+2. **Create initial configuration**:
+   ```bash
+   mkdir -p data/config data/prompts
+   # Copy or create your documents.json configuration
+   cp config/documents.json data/config/
+   cp prompts/default_comparison.txt data/prompts/
+   ```
+
+3. **Install minimal dependencies**:
+   ```bash
+   # Google Cloud Storage not required for local mode
+   pip install fastapi uvicorn requests beautifulsoup4 openai pydantic python-multipart
+   ```
+
+4. **Start the application**:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+See [LOCAL_MODE.md](LOCAL_MODE.md) for detailed local mode documentation.
 
 ### Cloud Deployment
 

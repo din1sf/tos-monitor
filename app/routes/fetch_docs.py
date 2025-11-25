@@ -207,48 +207,32 @@ async def process_document(
         # Generate hashes
         new_hashes = hasher.generate_all_hashes(normalized_content)
 
-        # Check for changes
-        old_document = await storage.get_latest_document(doc_id)
-        changes_detected = True
-        snapshot_created = False
+        # Create comprehensive metadata
+        metadata = hasher.create_metadata(
+            normalized_content,
+            url,
+            {
+                "document_id": doc_id,
+                "document_name": doc_name,
+                "title": page_data.get("title", ""),
+                "page_metadata": page_data.get("metadata", {}),
+                "normalization_applied": True,
+                "selector_used": selector,
+                "force_update": force_update
+            }
+        )
 
-        if old_document and not force_update:
-            old_metadata = old_document.get("metadata", {})
-            old_hashes = old_metadata.get("hashes", {})
+        # Use new ToS storage structure with current/last/prev/dated files
+        storage_result = await storage.store_tos_document(doc_id, normalized_content, metadata)
 
-            # Check if we should create a snapshot
-            if hasher.should_create_snapshot(old_hashes, new_hashes):
-                changes_detected = True
-                logger.info(f"Changes detected for {doc_id}, creating snapshot")
-            else:
-                changes_detected = False
-                logger.info(f"No significant changes detected for {doc_id}")
+        changes_detected = storage_result.get("changes_detected", False)
+        snapshot_created = storage_result.get("snapshot_created", False)
+        timestamp = storage_result.get("timestamp", None)
 
-        # Create snapshot if changes detected or force update
-        timestamp = None
-        if changes_detected or force_update:
-            # Create comprehensive metadata
-            metadata = hasher.create_metadata(
-                normalized_content,
-                url,
-                {
-                    "document_id": doc_id,
-                    "document_name": doc_name,
-                    "title": page_data.get("title", ""),
-                    "page_metadata": page_data.get("metadata", {}),
-                    "normalization_applied": True,
-                    "selector_used": selector,
-                    "force_update": force_update
-                }
-            )
-
-            # Store the snapshot
-            timestamp = await storage.store_document_snapshot(doc_id, normalized_content, metadata)
-            snapshot_created = True
-
-            logger.info(f"Created snapshot for {doc_id} at {timestamp}")
+        if changes_detected:
+            logger.info(f"Changes detected and snapshot created for {doc_id} at {timestamp}")
         else:
-            logger.info(f"Skipped snapshot creation for {doc_id} (no changes)")
+            logger.info(f"No changes detected for {doc_id}, only current.txt updated")
 
         return DocumentResult(
             document_id=doc_id,
