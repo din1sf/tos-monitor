@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routes import fetch_docs, generate_diffs, get_diffs
+from app.routes import fetch_docs, generate_diffs, get_diffs, tos
 from app.storage import get_storage_client
 from app.llm_client import get_llm_client
 
@@ -54,6 +54,7 @@ app.add_middleware(
 app.include_router(fetch_docs.router, tags=["Document Fetching"])
 app.include_router(generate_diffs.router, tags=["Diff Generation"])
 app.include_router(get_diffs.router, tags=["Diff Retrieval"])
+app.include_router(tos.router, tags=["ToS Documents"])
 
 
 @app.get("/", response_model=Dict[str, Any])
@@ -74,6 +75,8 @@ async def root():
             "get_diff": "GET /diffs/{document_id} - Get latest diff for a document",
             "get_diff_history": "GET /diffs/{document_id}/history - Get diff history",
             "get_specific_diff": "GET /diffs/{document_id}/{timestamp} - Get specific diff by timestamp",
+            "list_tos": "GET /tos - List all ToS documents with version information",
+            "get_tos": "GET /tos/{document_id} - Get detailed information for a specific ToS document",
             "health": "GET /health - Health check endpoint",
             "docs": "GET /docs - API documentation"
         }
