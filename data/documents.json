@@ -1,0 +1,10 @@
+{
+  "documents": [
+    {
+      "id": "anthropic",
+      "name": "Anthropic Commercial Terms",
+      "url": "https://www.anthropic.com/legal/commercial-terms",
+      "selector": "main"
+    }
+  ]
+}

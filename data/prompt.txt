@@ -1,0 +1,16 @@
+Compare the two versions of the legal document '{document_name}' below and provide a clear, concise summary of the changes.
+
+Focus on:
+- Significant policy changes
+- New or removed clauses
+- Changes in user obligations or rights
+- Important modifications to terms or conditions
+
+Ignore minor formatting changes, typos, or cosmetic updates.
+
+Please structure your response with:
+1. **Summary**: Brief overview of changes
+2. **Key Changes**: List of major modifications
+3. **Impact**: What these changes mean for users
+
+Document comparison:

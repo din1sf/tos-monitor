@@ -608,8 +608,8 @@ class LocalStorage:
 
     Storage Layout:
     - data/tos/<doc_id>/ (current.txt, last.txt, prev.txt, <date>.txt)
-    - data/tos/documents.json (configuration)
-    - data/prompts/
+    - data/documents.json (configuration)
+    - data/prompt.txt (LLM prompt for document comparison)
     """
 
     def __init__(self, base_path: str = "./data"):
@@ -942,7 +942,7 @@ class LocalStorage:
             Optional[Dict[str, Any]]: Configuration data or None
         """
         try:
-            config_path = f"tos/{config_name}"
+            config_path = config_name
             config_str = await self.download_file(config_path)
 
             if config_str is None:
@@ -965,7 +965,7 @@ class LocalStorage:
             bool: True if successful, False otherwise
         """
         try:
-            config_path = f"tos/{config_name}"
+            config_path = config_name
             return await self.upload_file(
                 config_path,
                 json.dumps(config_data, indent=2)
@@ -974,31 +974,33 @@ class LocalStorage:
             logger.error(f"Failed to save config {config_name}: {str(e)}")
             return False
 
-    async def load_prompt(self, prompt_name: str = "default_comparison.txt") -> Optional[str]:
+    async def load_prompt(self, prompt_name: str = "prompt.txt") -> Optional[str]:
         """
         Load a prompt template from local storage.
 
         Args:
-            prompt_name: Name of the prompt file
+            prompt_name: Name of the prompt file (defaults to 'prompt.txt')
 
         Returns:
             Optional[str]: Prompt content or None
         """
-        prompt_path = f"prompts/{prompt_name}"
+        # Always use 'prompt.txt' in data root, ignoring the prompt_name parameter for simplicity
+        prompt_path = "prompt.txt"
         return await self.download_file(prompt_path)
 
-    async def save_prompt(self, prompt_content: str, prompt_name: str = "default_comparison.txt") -> bool:
+    async def save_prompt(self, prompt_content: str, prompt_name: str = "prompt.txt") -> bool:
         """
         Save a prompt template to local storage.
 
         Args:
             prompt_content: Prompt content
-            prompt_name: Name of the prompt file
+            prompt_name: Name of the prompt file (defaults to 'prompt.txt')
 
         Returns:
             bool: True if successful, False otherwise
         """
-        prompt_path = f"prompts/{prompt_name}"
+        # Always use 'prompt.txt' in data root, ignoring the prompt_name parameter for simplicity
+        prompt_path = "prompt.txt"
         return await self.upload_file(prompt_path, prompt_content)
 
     # ToS-specific storage methods

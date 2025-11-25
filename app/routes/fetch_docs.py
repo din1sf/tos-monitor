@@ -21,9 +21,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class Document(BaseModel):
+    """Document model matching documents.json structure."""
+    id: str
+    name: str
+    url: str
+    selector: Optional[str] = None
+    description: Optional[str] = None
+
+
 class FetchRequest(BaseModel):
     """Request model for fetch-docs endpoint."""
-    document_ids: Optional[List[str]] = None  # Filter specific documents
+    documents: Optional[List[Document]] = None  # Provide documents directly instead of using documents.json
+    document_ids: Optional[List[str]] = None  # Filter specific documents (legacy support)
     force_update: bool = False  # Force update even if no changes detected
 
 
@@ -72,20 +82,25 @@ async def fetch_documents(request: FetchRequest = FetchRequest()):
         normalizer = get_text_normalizer()
         hasher = get_content_hasher()
 
-        # Load document configuration
-        config = await storage.load_config("documents.json")
-        if not config:
-            raise HTTPException(
-                status_code=500,
-                detail="Could not load document configuration from storage"
-            )
+        # Use documents from request if provided, otherwise load from documents.json
+        if request.documents:
+            # Use documents directly from request body
+            documents = [doc.model_dump() for doc in request.documents]
+        else:
+            # Load document configuration from file
+            config = await storage.load_config("documents.json")
+            if not config:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not load document configuration from storage"
+                )
 
-        documents = config.get("documents", [])
-        if not documents:
-            raise HTTPException(
-                status_code=400,
-                detail="No documents configured in documents.json"
-            )
+            documents = config.get("documents", [])
+            if not documents:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No documents configured in documents.json"
+                )
 
         # Filter documents if specific IDs requested
         if request.document_ids:

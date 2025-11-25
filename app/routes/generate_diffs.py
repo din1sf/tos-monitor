@@ -313,7 +313,7 @@ async def process_document_diff(
 
 async def load_diff_prompt(storage, doc_id: str) -> str:
     """
-    Load appropriate diff prompt for a document.
+    Load prompt from data/prompt.txt file.
 
     Args:
         storage: Storage client
@@ -322,20 +322,14 @@ async def load_diff_prompt(storage, doc_id: str) -> str:
     Returns:
         str: Prompt template content
     """
-    # Try document-specific prompt first
-    doc_specific_prompt = await storage.load_prompt(f"{doc_id}_comparison.txt")
-    if doc_specific_prompt:
-        logger.debug(f"Using document-specific prompt for {doc_id}")
-        return doc_specific_prompt
-
-    # Fall back to default prompt
-    default_prompt = await storage.load_prompt("default_comparison.txt")
-    if default_prompt:
-        logger.debug(f"Using default prompt for {doc_id}")
-        return default_prompt
+    # Try to load prompt.txt from data folder
+    prompt = await storage.load_prompt("prompt.txt")
+    if prompt:
+        logger.debug(f"Using prompt from data/prompt.txt for {doc_id}")
+        return prompt
 
     # Use built-in fallback prompt
-    logger.warning(f"No prompt found in storage, using built-in fallback for {doc_id}")
+    logger.warning(f"No prompt.txt found in data folder, using built-in fallback for {doc_id}")
     return get_fallback_prompt()
 
 
