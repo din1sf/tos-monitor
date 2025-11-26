@@ -134,7 +134,18 @@ async def health_check():
             }
 
         # Check environment variables
-        required_env_vars = ["STORAGE_BUCKET", "OPENAI_API_KEY"]
+        storage_mode = os.getenv("STORAGE_MODE", "cloud").lower()
+        ai_provider = os.getenv("AI_PROVIDER", "openai").lower()
+
+        required_env_vars = []
+        if storage_mode == "cloud":
+            required_env_vars.append("STORAGE_BUCKET")
+
+        if ai_provider == "openai":
+            required_env_vars.append("OPENAI_API_KEY")
+        elif ai_provider == "openrouter":
+            required_env_vars.append("OPENROUTER_API_KEY")
+
         missing_vars = []
         for var in required_env_vars:
             if not os.getenv(var):
@@ -240,9 +251,11 @@ async def startup_event():
     """
     logger.info("Starting ToS Monitor application")
 
-    # Validate required environment variables based on storage mode
+    # Validate required environment variables based on storage mode and AI provider
     storage_mode = os.getenv("STORAGE_MODE", "cloud").lower()
-    required_vars = ["OPENAI_API_KEY"]
+    ai_provider = os.getenv("AI_PROVIDER", "openai").lower()
+
+    required_vars = []
     missing_vars = []
 
     # Add storage-specific requirements
@@ -255,6 +268,15 @@ async def startup_event():
     else:
         logger.error(f"Invalid STORAGE_MODE '{storage_mode}'. Must be 'local' or 'cloud'")
         raise RuntimeError(f"Invalid STORAGE_MODE '{storage_mode}'. Must be 'local' or 'cloud'")
+
+    # Add AI provider-specific requirements
+    if ai_provider == "openai":
+        required_vars.append("OPENAI_API_KEY")
+    elif ai_provider == "openrouter":
+        required_vars.append("OPENROUTER_API_KEY")
+    else:
+        logger.error(f"Invalid AI_PROVIDER '{ai_provider}'. Must be 'openai' or 'openrouter'")
+        raise RuntimeError(f"Invalid AI_PROVIDER '{ai_provider}'. Must be 'openai' or 'openrouter'")
 
     for var in required_vars:
         if not os.getenv(var):

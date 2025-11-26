@@ -123,7 +123,7 @@ class CloudStorage:
 
     Storage Layout:
     - tos/<doc_id>/ (current.txt, last.txt, prev.txt, <date>.txt)
-    - tos/documents.json (configuration)
+    - documents.json (configuration)
     - prompts/
     """
 
@@ -428,7 +428,7 @@ class CloudStorage:
             Optional[Dict[str, Any]]: Configuration data or None
         """
         try:
-            config_path = f"tos/{config_name}"
+            config_path = config_name
             config_str = await self.download_file(config_path)
 
             if config_str is None:

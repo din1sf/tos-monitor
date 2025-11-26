@@ -1,0 +1,2 @@
+# Requirements for upload_to_gcs.py script
+google-cloud-storage>=2.10.0
