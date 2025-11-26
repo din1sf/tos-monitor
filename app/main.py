@@ -77,6 +77,9 @@ async def root():
             "get_specific_diff": "GET /diffs/{document_id}/{timestamp} - Get specific diff by timestamp",
             "list_tos": "GET /tos - List all ToS documents with version information",
             "get_tos": "GET /tos/{document_id} - Get detailed information for a specific ToS document",
+            "get_tos_prev": "GET /tos/{document_id}/prev - Get plain text content of previous version of a ToS document",
+            "get_tos_last": "GET /tos/{document_id}/last - Get plain text content of last version of a ToS document",
+            "get_tos_date": "GET /tos/{document_id}/{date} - Get plain text content of specific dated version of a ToS document",
             "health": "GET /health - Health check endpoint",
             "docs": "GET /docs - API documentation"
         }

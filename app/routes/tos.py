@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.storage import get_storage_client
 
@@ -236,44 +236,8 @@ async def get_tos_document(document_id: str):
             "prev": prev_date,
             "changed": has_changes,
             "total": len(available_dates),
-            "available_dates": available_dates,
-            "details": {
-                "current": {
-                    "date": current_date,
-                    "timestamp": current_metadata.get("timestamp"),
-                    "content_length": current_metadata.get("content_length"),
-                    "content_hash": current_metadata.get("content_hash"),
-                    "structural_hash": current_metadata.get("structural_hash"),
-                    "title": current_metadata.get("title")
-                },
-                "last": None,
-                "prev": None
-            }
+            "available_dates": available_dates
         }
-
-        # Add last document details if available
-        if last_doc and last_date:
-            last_metadata = last_doc.get("metadata", {})
-            document_info["details"]["last"] = {
-                "date": last_date,
-                "timestamp": last_metadata.get("timestamp"),
-                "content_length": last_metadata.get("content_length"),
-                "content_hash": last_metadata.get("content_hash"),
-                "structural_hash": last_metadata.get("structural_hash"),
-                "title": last_metadata.get("title")
-            }
-
-        # Add prev document details if available
-        if prev_doc and prev_date:
-            prev_metadata = prev_doc.get("metadata", {})
-            document_info["details"]["prev"] = {
-                "date": prev_date,
-                "timestamp": prev_metadata.get("timestamp"),
-                "content_length": prev_metadata.get("content_length"),
-                "content_hash": prev_metadata.get("content_hash"),
-                "structural_hash": prev_metadata.get("structural_hash"),
-                "title": prev_metadata.get("title")
-            }
 
         return document_info
 
@@ -281,4 +245,168 @@ async def get_tos_document(document_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting ToS document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{document_id}/prev", response_class=PlainTextResponse)
+async def get_tos_document_prev_content(document_id: str):
+    """
+    Get the content of the previous version of a ToS document as plain text.
+
+    Args:
+        document_id: The ID of the document to retrieve
+
+    Returns:
+        Plain text content of the document
+    """
+    try:
+        storage = get_storage_client()
+
+        # Verify document exists in configuration
+        config = await storage.load_config("documents.json")
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail="Document configuration not found"
+            )
+
+        documents = config.get("documents", [])
+        doc_config = None
+        for doc in documents:
+            if doc.get("id") == document_id:
+                doc_config = doc
+                break
+
+        if not doc_config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document '{document_id}' not found in configuration"
+            )
+
+        # Get previous document content
+        prev_doc = await storage.get_tos_document(document_id, "prev")
+        if not prev_doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Previous version of document '{document_id}' not found"
+            )
+
+        return PlainTextResponse(content=prev_doc.get("content", ""), media_type="text/plain")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting previous content for document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{document_id}/last", response_class=PlainTextResponse)
+async def get_tos_document_last_content(document_id: str):
+    """
+    Get the content of the last version of a ToS document as plain text.
+
+    Args:
+        document_id: The ID of the document to retrieve
+
+    Returns:
+        Plain text content of the document
+    """
+    try:
+        storage = get_storage_client()
+
+        # Verify document exists in configuration
+        config = await storage.load_config("documents.json")
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail="Document configuration not found"
+            )
+
+        documents = config.get("documents", [])
+        doc_config = None
+        for doc in documents:
+            if doc.get("id") == document_id:
+                doc_config = doc
+                break
+
+        if not doc_config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document '{document_id}' not found in configuration"
+            )
+
+        # Get last document content
+        last_doc = await storage.get_tos_document(document_id, "last")
+        if not last_doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Last version of document '{document_id}' not found"
+            )
+
+        return PlainTextResponse(content=last_doc.get("content", ""), media_type="text/plain")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting last content for document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{document_id}/{date}", response_class=PlainTextResponse)
+async def get_tos_document_date_content(document_id: str, date: str):
+    """
+    Get the content of a specific dated version of a ToS document as plain text.
+
+    Args:
+        document_id: The ID of the document to retrieve
+        date: The date of the version to retrieve (YYYY-MM-DD format)
+
+    Returns:
+        Plain text content of the document
+    """
+    try:
+        storage = get_storage_client()
+
+        # Verify document exists in configuration
+        config = await storage.load_config("documents.json")
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail="Document configuration not found"
+            )
+
+        documents = config.get("documents", [])
+        doc_config = None
+        for doc in documents:
+            if doc.get("id") == document_id:
+                doc_config = doc
+                break
+
+        if not doc_config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document '{document_id}' not found in configuration"
+            )
+
+        # Validate date format (basic check)
+        if len(date) != 10 or date.count('-') != 2:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid date format '{date}'. Expected YYYY-MM-DD format"
+            )
+
+        # Get specific dated document content
+        dated_doc = await storage.get_tos_document(document_id, date)
+        if not dated_doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Version '{date}' of document '{document_id}' not found"
+            )
+
+        return PlainTextResponse(content=dated_doc.get("content", ""), media_type="text/plain")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting dated content for document {document_id}, date {date}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
