@@ -61,7 +61,7 @@ class FetchResponse(BaseModel):
     processing_time: float
 
 
-@router.post("/fetch-docs", response_model=FetchResponse)
+@router.post("/sync", response_model=FetchResponse)
 async def fetch_documents(request: FetchRequest = FetchRequest()):
     """
     Fetch and process legal documents.
