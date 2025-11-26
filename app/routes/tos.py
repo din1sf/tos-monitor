@@ -8,14 +8,35 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import JSONResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 
 from app.storage import get_storage_client
+from app.tos_client import ToSClient
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tos", tags=["ToS Documents"])
+
+
+class AnalyzeRequest(BaseModel):
+    """Request model for document analysis."""
+    ai_provider: Optional[str] = Field(
+        None,
+        description="AI provider to use ('openai' or 'openrouter'). If not provided, uses AI_PROVIDER env var.",
+        example="openrouter"
+    )
+    prev: Optional[str] = Field(
+        None,
+        description="Previous version to compare (YYYY-MM-DD format or 'prev'). If not provided, uses 'prev' pointer.",
+        example="2025-11-25"
+    )
+    last: Optional[str] = Field(
+        None,
+        description="Latest version to compare (YYYY-MM-DD format or 'last'). If not provided, uses 'last' pointer.",
+        example="2025-11-26"
+    )
 
 
 @router.get("", response_model=Dict[str, Any])
@@ -410,3 +431,151 @@ async def get_tos_document_date_content(document_id: str, date: str):
     except Exception as e:
         logger.error(f"Error getting dated content for document {document_id}, date {date}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/{document_id}", response_class=PlainTextResponse)
+async def analyze_tos_document(
+    document_id: str,
+    request: AnalyzeRequest = Body(...)
+):
+    """
+    Generate AI-powered difference analysis between two versions of a ToS document.
+
+    By default compares the latest and previous versions as defined by the pointer system.
+    Optionally accepts specific dates and AI provider for custom comparison.
+
+    Args:
+        document_id: The ID of the document to analyze
+        request: Analysis configuration with optional ai_provider, prev_date, latest_date
+
+    Returns:
+        Plain text response with AI analysis content only
+    """
+    try:
+        storage = get_storage_client()
+        tos_client = ToSClient(ai_provider=request.ai_provider)
+
+        logger.info(f"Starting analysis for document: {document_id}")
+
+        # Verify document exists in configuration
+        config = await storage.load_config("documents.json")
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail="Document configuration not found"
+            )
+
+        documents = config.get("documents", [])
+        doc_config = None
+        for doc in documents:
+            if doc.get("id") == document_id:
+                doc_config = doc
+                break
+
+        if not doc_config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document '{document_id}' not found in configuration"
+            )
+
+        # Determine which versions to compare
+        prev_version = request.prev if request.prev else "prev"
+        latest_version = request.last if request.last else "last"
+
+        logger.info(f"Comparing versions: {prev_version} vs {latest_version}")
+
+        # Get document versions
+        try:
+            prev_doc = await storage.get_tos_document(document_id, prev_version)
+            if not prev_doc:
+                available_versions = await _get_available_versions(storage, document_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Previous version '{prev_version}' not found for document '{document_id}'. "
+                           f"Available versions: {available_versions}"
+                )
+
+            latest_doc = await storage.get_tos_document(document_id, latest_version)
+            if not latest_doc:
+                available_versions = await _get_available_versions(storage, document_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Latest version '{latest_version}' not found for document '{document_id}'. "
+                           f"Available versions: {available_versions}"
+                )
+
+        except Exception as e:
+            if "HTTPException" in str(type(e)):
+                raise
+            logger.error(f"Error fetching document versions: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch document versions: {str(e)}"
+            )
+
+        # Extract content
+        prev_content = prev_doc.get("content", "")
+        latest_content = latest_doc.get("content", "")
+
+        if not prev_content:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Previous version '{prev_version}' has no content"
+            )
+
+        if not latest_content:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Latest version '{latest_version}' has no content"
+            )
+
+        # Check if documents are identical
+        if prev_content.strip() == latest_content.strip():
+            return PlainTextResponse(
+                content=f"No differences found between versions {prev_version} and {latest_version} of {doc_config.get('name', document_id)}.",
+                media_type="text/plain"
+            )
+
+        # Perform analysis using ToS client (no approval required)
+        analysis_result = await tos_client.analyze_documents(
+            previous_content=prev_content,
+            current_content=latest_content,
+            document_name=doc_config.get("name", document_id),
+            metadata=None,
+            request_approval=False
+        )
+
+        logger.info(f"Analysis completed for document {document_id} with status: {analysis_result.get('status')}")
+
+        # Return only the AI analysis content as plain text
+        if analysis_result.get("status") == "success":
+            analysis_content = analysis_result.get("analysis", "")
+            return PlainTextResponse(content=analysis_content, media_type="text/plain")
+        else:
+            # Return error message as plain text
+            error_message = analysis_result.get("message", "Analysis failed")
+            return PlainTextResponse(content=f"Error: {error_message}", media_type="text/plain")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing ToS document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+async def _get_available_versions(storage, document_id: str) -> List[str]:
+    """Helper function to get available versions for error messages."""
+    try:
+        prefix = f"tos/{document_id}/"
+        all_files = await storage.list_files(prefix)
+
+        versions = []
+        for file_path in all_files:
+            filename = file_path.split("/")[-1]
+            if filename.endswith(".txt"):
+                version = filename[:-4]  # Remove .txt
+                versions.append(version)
+
+        return sorted(versions)
+    except Exception:
+        return ["Unable to list available versions"]
