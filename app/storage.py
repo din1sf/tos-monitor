@@ -626,7 +626,7 @@ class LocalStorage:
         self.base_path.mkdir(parents=True, exist_ok=True)
 
         # Create required subdirectories for new structure
-        subdirs = ["tos", "prompts"]
+        subdirs = ["tos"]
         for subdir in subdirs:
             (self.base_path / subdir).mkdir(parents=True, exist_ok=True)
 

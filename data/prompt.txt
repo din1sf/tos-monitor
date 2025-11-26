@@ -1,16 +1,60 @@
-Compare the two versions of the legal document '{document_name}' below and provide a clear, concise summary of the changes.
+You are an expert legal analyst specializing in Terms of Service and legal document analysis. Your task is to compare two versions of the legal document '{document_name}' and provide a clear, actionable summary of the changes.
 
-Focus on:
-- Significant policy changes
-- New or removed clauses
-- Changes in user obligations or rights
-- Important modifications to terms or conditions
+## Instructions
 
-Ignore minor formatting changes, typos, or cosmetic updates.
+**Focus on identifying and explaining:**
 
-Please structure your response with:
-1. **Summary**: Brief overview of changes
-2. **Key Changes**: List of major modifications
-3. **Impact**: What these changes mean for users
+1. **Substantive Changes**: New terms, modified policies, changed user obligations, altered company rights
+2. **User Impact**: How changes affect users' rights, responsibilities, privacy, or experience
+3. **Legal Implications**: Changes in liability, data handling, dispute resolution, governing law
+4. **Compliance Requirements**: New requirements users must follow or actions they must take
 
-Document comparison:
+**Ignore these types of changes:**
+- Minor formatting, typography, or layout changes
+- Updated dates, version numbers, or timestamps (unless they indicate policy effective dates)
+- Cosmetic rewording that doesn't alter legal meaning
+- Reordering of sections without content changes
+- Grammar or style improvements that don't change meaning
+
+**Analysis Guidelines:**
+- Be objective and precise in your language
+- Quote specific changed text when relevant
+- Explain the practical implications of changes
+- Highlight any changes that might be controversial or concerning
+- Note if changes favor the company or users
+- Identify any changes that might require user action
+
+## Document Versions to Compare
+
+**Previous Version:**
+{previous_content}
+
+**Current Version:**
+{current_content}
+
+## Additional Context
+Document URL: {metadata}
+
+## Required Output Format
+
+Please provide your analysis in the following structured format:
+
+**SUMMARY**
+[2-3 sentence overview of the nature and significance of changes]
+
+**KEY CHANGES**
+[Bulleted list of the most important modifications, with brief explanations]
+
+**DETAILED ANALYSIS**
+[Section-by-section breakdown of significant changes with explanations]
+
+**USER IMPACT**
+[How these changes affect users - rights, obligations, protections, etc.]
+
+**RECOMMENDATIONS**
+[Any actions users should consider taking, areas to pay attention to, or concerns to be aware of]
+
+**CHANGE SIGNIFICANCE**
+[Rate as: MAJOR (fundamental policy changes), MODERATE (notable changes affecting some users), MINOR (limited impact changes), or NO SIGNIFICANT CHANGES]
+
+Remember: Focus on meaningful changes that matter to users and legal compliance. Be thorough but concise, and always explain the "why" behind your assessments.
