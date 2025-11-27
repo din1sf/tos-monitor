@@ -8,8 +8,8 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from fastapi import APIRouter, HTTPException, Body
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.storage import get_storage_client
@@ -433,10 +433,11 @@ async def get_tos_document_date_content(document_id: str, date: str):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/{document_id}", response_class=PlainTextResponse)
+@router.post("/{document_id}")
 async def analyze_tos_document(
     document_id: str,
-    request: AnalyzeRequest = Body(...)
+    request: AnalyzeRequest = Body(...),
+    html: bool = Query(False, description="Return HTML formatted response instead of plain text")
 ):
     """
     Generate AI-powered difference analysis between two versions of a ToS document.
@@ -531,10 +532,14 @@ async def analyze_tos_document(
 
         # Check if documents are identical
         if prev_content.strip() == latest_content.strip():
-            return PlainTextResponse(
-                content=f"No differences found between versions {prev_version} and {latest_version} of {doc_config.get('name', document_id)}.",
-                media_type="text/plain"
-            )
+            no_diff_message = f"No differences found between versions {prev_version} and {latest_version} of {doc_config.get('name', document_id)}."
+
+            if html:
+                from app.utils.html_formatter import markdown_to_html
+                html_content = markdown_to_html(no_diff_message)
+                return HTMLResponse(content=html_content, media_type="text/html")
+            else:
+                return PlainTextResponse(content=no_diff_message, media_type="text/plain")
 
         # Perform analysis using ToS client (no approval required)
         analysis_result = await tos_client.analyze_documents(
@@ -547,14 +552,27 @@ async def analyze_tos_document(
 
         logger.info(f"Analysis completed for document {document_id} with status: {analysis_result.get('status')}")
 
-        # Return only the AI analysis content as plain text
+        # Return the AI analysis content
         if analysis_result.get("status") == "success":
             analysis_content = analysis_result.get("analysis", "")
-            return PlainTextResponse(content=analysis_content, media_type="text/plain")
+
+            if html:
+                from app.utils.html_formatter import markdown_to_html
+                html_content = markdown_to_html(analysis_content)
+                return HTMLResponse(content=html_content, media_type="text/html")
+            else:
+                return PlainTextResponse(content=analysis_content, media_type="text/plain")
         else:
-            # Return error message as plain text
+            # Return error message
             error_message = analysis_result.get("message", "Analysis failed")
-            return PlainTextResponse(content=f"Error: {error_message}", media_type="text/plain")
+            error_content = f"Error: {error_message}"
+
+            if html:
+                from app.utils.html_formatter import markdown_to_html
+                html_content = markdown_to_html(error_content)
+                return HTMLResponse(content=html_content, media_type="text/html")
+            else:
+                return PlainTextResponse(content=error_content, media_type="text/plain")
 
     except HTTPException:
         raise
