@@ -5,11 +5,29 @@ Upload ToS Monitor data to Google Cloud Storage.
 This script uploads the local data folder structure to a GCS bucket,
 maintaining the correct folder structure for the ToS Monitor application.
 
+This is only needed if you're deploying to Cloud Run with STORAGE_MODE=cloud.
+For local development, use STORAGE_MODE=local instead (stores in ./data folder).
+
 Usage:
-    python upload_to_gcs.py [--bucket BUCKET_NAME] [--data-dir DATA_DIR] [--dry-run]
+    python upload_to_gcs.py --bucket BUCKET_NAME [--data-dir DATA_DIR] [--dry-run]
 
 Requirements:
     pip install google-cloud-storage
+
+Prerequisites:
+    1. Create a GCS bucket in your GCP project
+    2. Authenticate with GCP: gcloud auth application-default login
+    3. Ensure you have write permissions to the bucket
+
+Examples:
+    # Preview what would be uploaded (dry run)
+    python upload_to_gcs.py --bucket my-tos-bucket --dry-run
+
+    # Actually upload the files
+    python upload_to_gcs.py --bucket my-tos-bucket
+
+    # Upload from custom data directory
+    python upload_to_gcs.py --bucket my-tos-bucket --data-dir /path/to/data
 """
 
 import argparse
@@ -219,9 +237,15 @@ Examples:
   python upload_to_gcs.py --bucket my-tos-bucket --data-dir ./data --dry-run
   python upload_to_gcs.py --bucket my-tos-bucket --data-dir /path/to/data
 
+Prerequisites:
+  1. Create a GCS bucket: gsutil mb gs://my-tos-bucket
+  2. Authenticate: gcloud auth application-default login
+  3. Ensure you have write permissions to the bucket
+
 Note:
-  - Make sure you're authenticated with gcloud: gcloud auth application-default login
-  - The bucket must already exist and you must have write permissions
+  - This script is only needed for Cloud Run deployment (STORAGE_MODE=cloud)
+  - For local development, use STORAGE_MODE=local to store in ./data folder
+  - After uploading, make sure to set STORAGE_BUCKET in your Cloud Run environment
         """
     )
 

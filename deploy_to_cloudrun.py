@@ -385,14 +385,25 @@ class CloudRunDeployer:
 
 def load_config_from_env() -> Dict:
     """
-    Load configuration from .env file and environment variables.
+    Load configuration from .env.cloud and .env files and environment variables.
 
     Returns:
         Configuration dictionary
     """
     config = {}
 
-    # Try to load from .env file
+    # Try to load from .env.cloud file first (for cloud-specific config)
+    env_cloud_file = Path('.env.cloud')
+    if env_cloud_file.exists():
+        print(f"📄 Loading configuration from {env_cloud_file}")
+        with open(env_cloud_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+    # Then load from .env file (can override .env.cloud)
     env_file = Path('.env')
     if env_file.exists():
         print(f"📄 Loading configuration from {env_file}")
@@ -477,8 +488,23 @@ Examples:
   python deploy_to_cloudrun.py --local-build      # Use local Docker instead of Cloud Build
 
 Configuration:
-  The script reads configuration from .env file and environment variables.
-  Required: GOOGLE_CLOUD_PROJECT, STORAGE_BUCKET, OPENROUTER_API_KEY (or OPENAI_API_KEY)
+  The script reads configuration from .env.cloud and .env files (in that order).
+  .env.cloud values are loaded first, then .env can override them.
+  Environment variables take precedence over file values.
+  NOTE: This script always deploys with STORAGE_MODE=cloud (Google Cloud Storage)
+
+  Required settings:
+    - GOOGLE_CLOUD_PROJECT: Your GCP project ID
+    - STORAGE_BUCKET: GCS bucket name for document storage
+    - OPENROUTER_API_KEY or OPENAI_API_KEY: LLM provider credentials
+
+  To use this script:
+    1. Create/edit .env.cloud with your cloud configuration
+    2. Optionally create .env to override specific values
+    3. Run: python deploy_to_cloudrun.py --dry-run  (preview)
+    4. Run: python deploy_to_cloudrun.py             (deploy)
+
+  For local development with file storage, see .env and STORAGE_MODE=local
         """
     )
 

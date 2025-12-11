@@ -80,11 +80,11 @@ class StorageInterface(Protocol):
         """Save configuration to storage."""
         ...
 
-    async def load_prompt(self, prompt_name: str = "default_comparison.txt") -> Optional[str]:
+    async def load_prompt(self, prompt_name: str = "prompt.txt") -> Optional[str]:
         """Load a prompt template from storage."""
         ...
 
-    async def save_prompt(self, prompt_content: str, prompt_name: str = "default_comparison.txt") -> bool:
+    async def save_prompt(self, prompt_content: str, prompt_name: str = "prompt.txt") -> bool:
         """Save a prompt template to storage."""
         ...
 
@@ -124,7 +124,7 @@ class CloudStorage:
     Storage Layout:
     - tos/<doc_id>/ (current.txt, last.txt, prev.txt, <date>.txt)
     - documents.json (configuration)
-    - prompts/
+    - prompt.txt (prompt template)
     """
 
     def __init__(self, bucket_name: str):
@@ -461,7 +461,7 @@ class CloudStorage:
             logger.error(f"Failed to save config {config_name}: {str(e)}")
             return False
 
-    async def load_prompt(self, prompt_name: str = "default_comparison.txt") -> Optional[str]:
+    async def load_prompt(self, prompt_name: str = "prompt.txt") -> Optional[str]:
         """
         Load a prompt template from storage.
 
@@ -471,10 +471,10 @@ class CloudStorage:
         Returns:
             Optional[str]: Prompt content or None
         """
-        prompt_path = f"prompts/{prompt_name}"
+        prompt_path = prompt_name
         return await self.download_file(prompt_path)
 
-    async def save_prompt(self, prompt_content: str, prompt_name: str = "default_comparison.txt") -> bool:
+    async def save_prompt(self, prompt_content: str, prompt_name: str = "prompt.txt") -> bool:
         """
         Save a prompt template to storage.
 
@@ -485,7 +485,7 @@ class CloudStorage:
         Returns:
             bool: True if successful, False otherwise
         """
-        prompt_path = f"prompts/{prompt_name}"
+        prompt_path = prompt_name
         return await self.upload_file(prompt_path, prompt_content)
 
     # ToS-specific storage methods
