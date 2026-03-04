@@ -490,14 +490,14 @@ async def analyze_tos_document(
             prev_doc = await storage.get_tos_document(document_id, prev_version)
             if not prev_doc:
                 # If no previous version exists, return no changes detected
-                no_prev_message = f"No previous version found for {doc_config.get('name', document_id)}. Cannot detect changes."
+                no_changes_message = f"No changes detected for {doc_config.get('name', document_id)}. Previous version not available for comparison."
 
                 if html:
                     from app.utils.html_formatter import markdown_to_html
-                    html_content = markdown_to_html(no_prev_message)
+                    html_content = markdown_to_html(no_changes_message)
                     return HTMLResponse(content=html_content, media_type="text/html")
                 else:
-                    return PlainTextResponse(content=no_prev_message, media_type="text/plain")
+                    return PlainTextResponse(content=no_changes_message, media_type="text/plain")
 
             latest_doc = await storage.get_tos_document(document_id, latest_version)
             if not latest_doc:
