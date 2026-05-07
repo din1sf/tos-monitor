@@ -274,9 +274,12 @@ async def startup_event():
         required_vars.append("OPENAI_API_KEY")
     elif ai_provider == "openrouter":
         required_vars.append("OPENROUTER_API_KEY")
+    elif ai_provider == "bosch-llm-farm":
+        required_vars.append("ANTHROPIC_AUTH_TOKEN")
+        required_vars.append("BOSCH_LLM_MODEL")
     else:
-        logger.error(f"Invalid AI_PROVIDER '{ai_provider}'. Must be 'openai' or 'openrouter'")
-        raise RuntimeError(f"Invalid AI_PROVIDER '{ai_provider}'. Must be 'openai' or 'openrouter'")
+        logger.error(f"Invalid AI_PROVIDER '{ai_provider}'. Must be 'openai', 'openrouter', or 'bosch-llm-farm'")
+        raise RuntimeError(f"Invalid AI_PROVIDER '{ai_provider}'. Must be 'openai', 'openrouter', or 'bosch-llm-farm'")
 
     for var in required_vars:
         if not os.getenv(var):

@@ -8,10 +8,12 @@ All clients follow the AIClient protocol defined in base.py.
 from .base import AIClient, BaseAIClient
 from .openai_client import OpenAIClient
 from .openrouter_client import OpenRouterClient
+from .bosch_llm_farm_client import BoschLLMFarmClient
 
 __all__ = [
     "AIClient",
     "BaseAIClient",
     "OpenAIClient",
-    "OpenRouterClient"
+    "OpenRouterClient",
+    "BoschLLMFarmClient"
 ]

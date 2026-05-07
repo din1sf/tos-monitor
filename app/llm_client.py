@@ -11,7 +11,7 @@ import os
 import logging
 from typing import Union
 
-from .clients import AIClient, OpenAIClient, OpenRouterClient
+from .clients import AIClient, OpenAIClient, OpenRouterClient, BoschLLMFarmClient
 
 
 logger = logging.getLogger(__name__)
@@ -53,8 +53,19 @@ def get_llm_client(provider: str = None) -> AIClient:
 
         return OpenRouterClient(api_key=api_key, model=model)
 
+    elif provider.lower() == "bosch-llm-farm":
+        auth_token = os.getenv("ANTHROPIC_AUTH_TOKEN")
+        model = os.getenv("BOSCH_LLM_MODEL")
+
+        if not auth_token:
+            raise ValueError("ANTHROPIC_AUTH_TOKEN environment variable is required")
+        if not model:
+            raise ValueError("BOSCH_LLM_MODEL environment variable is required")
+
+        return BoschLLMFarmClient(auth_token=auth_token, model=model)
+
     else:
-        raise ValueError(f"Unsupported provider: {provider}. Supported providers: openai, openrouter")
+        raise ValueError(f"Unsupported provider: {provider}. Supported providers: openai, openrouter, bosch-llm-farm")
 
 
 def get_openai_client() -> OpenAIClient:
@@ -77,6 +88,16 @@ def get_openrouter_client() -> OpenRouterClient:
     return get_llm_client("openrouter")
 
 
+def get_bosch_llm_farm_client() -> BoschLLMFarmClient:
+    """
+    Get a configured Bosch LLM Farm client instance.
+
+    Returns:
+        BoschLLMFarmClient: Configured Bosch LLM Farm client
+    """
+    return get_llm_client("bosch-llm-farm")
+
+
 def create_client(
     provider: str,
     api_key: str = None,
@@ -97,6 +118,8 @@ def create_client(
         return OpenAIClient(api_key=api_key, model=model)
     elif provider.lower() == "openrouter":
         return OpenRouterClient(api_key=api_key, model=model)
+    elif provider.lower() == "bosch-llm-farm":
+        return BoschLLMFarmClient(auth_token=api_key, model=model)
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
@@ -106,9 +129,11 @@ __all__ = [
     "AIClient",
     "OpenAIClient",
     "OpenRouterClient",
+    "BoschLLMFarmClient",
     "LLMClient",
     "get_llm_client",
     "get_openai_client",
     "get_openrouter_client",
+    "get_bosch_llm_farm_client",
     "create_client"
 ]

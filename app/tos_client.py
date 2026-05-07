@@ -78,8 +78,13 @@ class ToSClient:
                 else:
                     # Load from storage (default: data/prompt.txt)
                     try:
-                        self._prompt_template = await self.storage_client.read_text("prompt.txt")
-                        logger.info("Loaded prompt template from storage")
+                        self._prompt_template = await self.storage_client.load_prompt("prompt.txt")
+                        if self._prompt_template:
+                            logger.info("Loaded prompt template from storage")
+                        else:
+                            # Fallback to default template
+                            self._prompt_template = self._get_default_template()
+                            logger.info("No prompt template in storage, using default")
                     except Exception as e:
                         # Fallback to default template
                         self._prompt_template = self._get_default_template()
