@@ -11,7 +11,7 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 - 📊 **RESTful API**: Comprehensive API for document management, version tracking, and analysis
 - 🏗️ **Serverless Architecture**: Scales to zero when not in use, cost-effective operation
 - 🔄 **Version Management**: Maintains current, last, and previous versions with dated snapshots
-- 🔧 **Pluggable AI System**: Supports OpenAI, OpenRouter, and easily extensible to other providers
+- 🔧 **Pluggable AI System**: Supports OpenAI, OpenRouter, Bosch LLM Farm, and easily extensible to other providers
 
 ## Architecture
 
@@ -22,14 +22,17 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
                               ▼
-                       ┌─────────────────┐
-                       │   AI Providers  │
-                       │ OpenAI/OpenRouter│
-                       └─────────────────┘
+                       ┌─────────────────────────────┐
+                       │      AI Providers           │
+                       │ • OpenAI (GPT-4)            │
+                       │ • OpenRouter (Multi-model)  │
+                       │ • Bosch LLM Farm (Claude)   │
+                       └─────────────────────────────┘
 ```
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
@@ -39,6 +42,36 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+
+## Quick Start
+
+**For Bosch Users:** Get started in 5 minutes using Bosch LLM Farm (Claude Sonnet 4.5).
+
+```bash
+# 1. Clone and install
+git clone https://github.com/your-org/tos-monitor.git
+cd tos-monitor
+pip install -r requirements.txt
+
+# 2. Configure for Bosch LLM Farm
+cat > .env << EOF
+AI_PROVIDER=bosch-llm-farm
+ANTHROPIC_AUTH_TOKEN=your-bosch-token
+BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
+STORAGE_MODE=local
+EOF
+
+# 3. Start the service
+python -m uvicorn app.main:app --reload --port 8080
+
+# 4. In another terminal, sync and analyze
+curl -X POST http://localhost:8080/sync?document_ids=anthropic
+curl -X POST http://localhost:8080/tos/anthropic
+```
+
+**Result:** AI-powered analysis of document changes in seconds! 🚀
+
+For other providers (OpenAI, OpenRouter), see [Configuration](#configuration).
 
 ## Installation
 
@@ -88,27 +121,43 @@ Create a `.env` file with the following variables:
 #### Required Variables
 
 ```bash
-# Google Cloud Configuration
-GOOGLE_CLOUD_PROJECT=your-project-id
-STORAGE_BUCKET=your-bucket-name
+# Storage Configuration
+STORAGE_MODE=local  # or 'cloud' for Google Cloud Storage
+# STORAGE_BUCKET=your-bucket-name  # Required only if STORAGE_MODE=cloud
 
-# AI Provider Configuration (choose one)
-AI_PROVIDER=openrouter  # or 'openai'
-OPENROUTER_API_KEY=sk-or-v1-your-key
-# OR
+# AI Provider Configuration (choose one of the three options below)
+
+# Option 1: Bosch LLM Farm (Recommended for Bosch internal use)
+AI_PROVIDER=bosch-llm-farm
+ANTHROPIC_AUTH_TOKEN=your-bosch-auth-token
+BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
+
+# Option 2: OpenRouter (Access to multiple models via unified API)
+# AI_PROVIDER=openrouter
+# OPENROUTER_API_KEY=sk-or-v1-your-key
+# OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+
+# Option 3: OpenAI (Direct OpenAI API access)
 # AI_PROVIDER=openai
 # OPENAI_API_KEY=sk-your-openai-key
+# LLM_MODEL=gpt-4-turbo-preview
 ```
 
 #### Optional Variables
 
 ```bash
-# Model Selection
-LLM_MODEL=gpt-4o-mini                    # For OpenAI
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet  # For OpenRouter
+# Bosch LLM Farm Configuration (optional overrides)
+# Base URL for Bosch LLM Farm endpoint
+# Default: https://aoai-farm.bosch-temp.com/api/google/v1
+# BOSCH_LLM_BASE_URL=https://aoai-farm.bosch-temp.com/api/google/v1
 
-# Storage Configuration
-STORAGE_MODE=cloud  # or 'local'
+# Available Bosch models:
+# - claude-sonnet-4-5@20250929 (Latest, recommended)
+# - claude-haiku-4-5@20251001 (Faster, cheaper)
+# - gemini-1.5-pro, gemini-1.5-flash (Google models)
+
+# Google Cloud Configuration (only if STORAGE_MODE=cloud)
+GOOGLE_CLOUD_PROJECT=your-project-id
 
 # Server Configuration
 PORT=8080
@@ -144,6 +193,85 @@ Edit `config/documents.json` to define the documents you want to monitor:
 - `name`: Human-readable name
 - `url`: Target URL to monitor
 - `selector` (optional): CSS selector for content extraction
+
+### AI Provider Options
+
+The ToS Monitor supports three AI providers for document analysis:
+
+#### 1. Bosch LLM Farm (Recommended for Bosch Users)
+
+**Description:** Bosch internal LLM service providing access to Anthropic Claude models through a secure internal endpoint.
+
+**Advantages:**
+- ✅ Pre-approved for Bosch internal use
+- ✅ No external API costs
+- ✅ Compliance with Bosch security policies
+- ✅ Access to latest Claude models (Sonnet 4.5)
+- ✅ High-quality legal document analysis
+
+**Configuration:**
+```bash
+AI_PROVIDER=bosch-llm-farm
+ANTHROPIC_AUTH_TOKEN=your-token-from-bosch-portal
+BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
+```
+
+**API Format:** Anthropic Messages API via rawPredict endpoint
+
+**Endpoint:** `https://aoai-farm.bosch-temp.com/api/google/v1/publishers/anthropic/models/{model}:rawPredict`
+
+#### 2. OpenRouter
+
+**Description:** Unified API gateway providing access to multiple LLM providers (Anthropic, OpenAI, Google, Meta, etc.).
+
+**Advantages:**
+- ✅ Access to 100+ models from different providers
+- ✅ Flexible pricing and model selection
+- ✅ Single API key for all models
+- ✅ Good for experimentation and comparison
+
+**Configuration:**
+```bash
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-v1-your-key
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+```
+
+**Popular Models:**
+- `anthropic/claude-3.5-sonnet` - Best for legal analysis
+- `openai/gpt-4-turbo` - Strong general purpose
+- `meta-llama/llama-3.1-70b-instruct` - Open source option
+
+#### 3. OpenAI
+
+**Description:** Direct access to OpenAI's GPT models.
+
+**Advantages:**
+- ✅ Direct API access (no intermediary)
+- ✅ Latest GPT models
+- ✅ Well-documented and stable
+
+**Configuration:**
+```bash
+AI_PROVIDER=openai
+OPENAI_API_KEY=sk-your-openai-key
+LLM_MODEL=gpt-4-turbo-preview
+```
+
+**Popular Models:**
+- `gpt-4-turbo-preview` - Most capable
+- `gpt-4` - Stable, reliable
+- `gpt-3.5-turbo` - Fast and economical
+
+#### Provider Comparison
+
+| Feature | Bosch LLM Farm | OpenRouter | OpenAI |
+|---------|----------------|------------|--------|
+| **Best For** | Bosch employees | Flexibility | Direct GPT access |
+| **Cost** | Internal (free) | Pay-per-use | Pay-per-use |
+| **Models** | Claude, Gemini | 100+ models | GPT models only |
+| **Compliance** | Bosch-approved | External service | External service |
+| **Setup** | Bosch credentials | API key | API key |
 
 ### Authentication Setup
 
@@ -461,6 +589,9 @@ tos-monitor/
    NEW_PROVIDER_API_KEY=your-key
    ```
 
+**Example Implementation:**
+See `app/clients/bosch_llm_farm_client.py` for a complete Anthropic API-based implementation with Bearer token authentication using the rawPredict endpoint pattern.
+
 ### Running Tests
 
 ```bash
@@ -485,9 +616,15 @@ mypy app/
 
 ## Examples
 
-### Example 1: Monitor GitHub Terms of Service
+### Example 1: Using Bosch LLM Farm (Claude Sonnet 4.5)
 
 ```bash
+# Set up environment
+export AI_PROVIDER=bosch-llm-farm
+export ANTHROPIC_AUTH_TOKEN=your-token
+export BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
+export STORAGE_MODE=local
+
 # Configure document
 cat > config/documents.json << EOF
 {
@@ -502,14 +639,48 @@ cat > config/documents.json << EOF
 }
 EOF
 
+# Start the service
+python -m uvicorn app.main:app --reload --port 8080
+
+# In another terminal:
 # Sync the document
 curl -X POST http://localhost:8080/sync
 
-# Check for changes
-curl -X POST http://localhost:8080/tos/github_tos
+# Analyze changes with Bosch LLM Farm
+curl -X POST http://localhost:8080/tos/github_tos \
+  -H "Content-Type: application/json" \
+  -d '{"ai_provider": "bosch-llm-farm"}'
+
+# Get HTML formatted output
+curl -X POST "http://localhost:8080/tos/github_tos?html=true" \
+  -H "Content-Type: application/json" \
+  -d '{"ai_provider": "bosch-llm-farm"}'
 ```
 
-### Example 2: Batch Processing Multiple Documents
+### Example 2: Comparing AI Providers
+
+```bash
+# Analyze with different providers to compare results
+
+# Using Bosch LLM Farm (Claude)
+curl -X POST http://localhost:8080/tos/github_tos \
+  -H "Content-Type: application/json" \
+  -d '{"ai_provider": "bosch-llm-farm"}'
+
+# Using OpenRouter (also Claude)
+curl -X POST http://localhost:8080/tos/github_tos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ai_provider": "openrouter"
+  }'
+
+# Using OpenAI (GPT-4)
+curl -X POST http://localhost:8080/tos/github_tos \
+  -H "Content-Type: application/json" \
+  -d '{"ai_provider": "openai"}'
+```
+
+### Example 3: Batch Processing Multiple Documents
 
 ```bash
 # Configure multiple documents
@@ -537,14 +708,14 @@ curl -X POST http://localhost:8080/sync
 curl http://localhost:8080/tos
 ```
 
-### Example 3: Automated Monitoring with Cron
+### Example 4: Automated Monitoring with Cron
 
 ```bash
 # Add to crontab for daily monitoring
 0 9 * * * curl -X POST http://your-app.run.app/sync
 ```
 
-### Example 4: Integration with External Systems
+### Example 5: Integration with External Systems
 
 ```python
 import requests
@@ -629,6 +800,41 @@ Check for:
 - **API key validity**: Ensure keys are correctly set and not expired
 - **Model availability**: Verify the specified model is available
 - **Rate limits**: Check if you've hit provider rate limits
+
+#### 5. Bosch LLM Farm Specific Issues
+
+**Authentication Failed (401/403):**
+```bash
+# Verify your token
+echo $ANTHROPIC_AUTH_TOKEN
+
+# Test connection manually
+curl -X POST "https://aoai-farm.bosch-temp.com/api/google/v1/publishers/anthropic/models/claude-sonnet-4-5@20250929:rawPredict" \
+  -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"anthropic_version":"vertex-2023-10-16","messages":[{"role":"user","content":"Hello!"}],"max_tokens": 10}'
+```
+
+**Model Not Found (404):**
+- Verify the model name is correct: `claude-sonnet-4-5@20250929`
+- Check available models in Bosch LLM Farm portal
+- Ensure the model version suffix is included (e.g., `@20250929`)
+
+**Common Bosch LLM Farm Models:**
+```bash
+# Claude models (recommended for legal analysis)
+BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929  # Latest Sonnet
+BOSCH_LLM_MODEL=claude-haiku-4-5@20251001   # Faster, cheaper
+
+# Gemini models (also available)
+BOSCH_LLM_MODEL=gemini-1.5-pro
+BOSCH_LLM_MODEL=gemini-1.5-flash
+```
+
+**Endpoint Issues:**
+- Default endpoint: `https://aoai-farm.bosch-temp.com/api/google/v1`
+- Can be overridden with `BOSCH_LLM_BASE_URL` environment variable
+- Ensure you're on Bosch network or VPN
 
 ### Debug Mode
 
