@@ -5,6 +5,7 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 ## Features
 
 - 🔍 **Automatic Document Monitoring**: Fetches and monitors legal documents from configured URLs
+- 🖥️ **Web UI**: Browser-friendly interface for document management and analysis
 - 🤖 **AI-Powered Analysis**: Generates human-readable summaries of document changes using multiple LLM providers
 - ☁️ **Dual Storage**: Supports both Google Cloud Storage and local file storage modes
 - 🎯 **Intelligent Change Detection**: Multiple hashing strategies to distinguish between cosmetic and substantial changes
@@ -17,8 +18,8 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Scheduler     │    │   Cloud Run     │    │ Cloud Storage   │
-│  (Cloud Tasks)  │───▶│   (FastAPI)     │───▶│   (Buckets)     │
+│    Web UI       │    │   FastAPI App   │    │ Cloud Storage   │
+│  (Dashboard)    │───▶│  (REST API)     │───▶│  or Local FS    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
                               ▼
@@ -30,16 +31,22 @@ A serverless Terms of Service monitoring service that automatically tracks chang
                        └─────────────────────────────┘
 ```
 
+**Sync Triggering:** Document syncing is triggered manually via the Web UI or API. For automated scheduling, integrate with external cron or Cloud Scheduler to call `POST /sync` on a schedule.
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
+  - [Web UI](#web-ui)
+  - [API](#api)
 - [API Documentation](#api-documentation)
 - [Deployment](#deployment)
+  - [Cloud Run Deployment](#cloud-run-deployment)
+  - [GCS Upload](#gcs-upload)
+- [Testing](#testing)
 - [Development](#development)
-- [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -64,7 +71,10 @@ EOF
 # 3. Start the service
 python -m uvicorn app.main:app --reload --port 8080
 
-# 4. In another terminal, sync and analyze
+# 4. Open the web UI
+open http://localhost:8080/ui
+
+# Or use the API
 curl -X POST http://localhost:8080/sync?document_ids=anthropic
 curl -X POST http://localhost:8080/tos/anthropic
 ```
@@ -103,6 +113,7 @@ For other providers (OpenAI, OpenRouter), see [Configuration](#configuration).
 4. **Configure documents**
    ```bash
    # Edit config/documents.json with your target documents
+   # Or use the web UI to add documents
    ```
 
 ### Docker Setup
@@ -147,8 +158,6 @@ BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
 
 ```bash
 # Bosch LLM Farm Configuration (optional overrides)
-# Base URL for Bosch LLM Farm endpoint
-# Default: https://aoai-farm.bosch-temp.com/api/google/v1
 # BOSCH_LLM_BASE_URL=https://aoai-farm.bosch-temp.com/api/google/v1
 
 # Available Bosch models:
@@ -168,7 +177,16 @@ LOG_LEVEL=INFO
 
 ### Document Configuration
 
-Edit `config/documents.json` to define the documents you want to monitor:
+Documents can be configured in two ways:
+
+#### 1. Via Web UI (Recommended)
+- Start the application
+- Navigate to `http://localhost:8080/ui`
+- Click "Add Document" to add new documents
+- Use "Edit" and "Remove" from the three-dot menu for each document
+
+#### 2. Via JSON file
+Edit `config/documents.json`:
 
 ```json
 {
@@ -178,11 +196,6 @@ Edit `config/documents.json` to define the documents you want to monitor:
       "name": "GitHub Terms of Service",
       "url": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
       "selector": "article"
-    },
-    {
-      "id": "openai_usage",
-      "name": "OpenAI Usage Policies",
-      "url": "https://openai.com/policies/usage-policies"
     }
   ]
 }
@@ -196,18 +209,15 @@ Edit `config/documents.json` to define the documents you want to monitor:
 
 ### AI Provider Options
 
-The ToS Monitor supports three AI providers for document analysis:
+The ToS Monitor supports three AI providers:
 
 #### 1. Bosch LLM Farm (Recommended for Bosch Users)
-
-**Description:** Bosch internal LLM service providing access to Anthropic Claude models through a secure internal endpoint.
 
 **Advantages:**
 - ✅ Pre-approved for Bosch internal use
 - ✅ No external API costs
 - ✅ Compliance with Bosch security policies
 - ✅ Access to latest Claude models (Sonnet 4.5)
-- ✅ High-quality legal document analysis
 
 **Configuration:**
 ```bash
@@ -216,19 +226,11 @@ ANTHROPIC_AUTH_TOKEN=your-token-from-bosch-portal
 BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
 ```
 
-**API Format:** Anthropic Messages API via rawPredict endpoint
-
-**Endpoint:** `https://aoai-farm.bosch-temp.com/api/google/v1/publishers/anthropic/models/{model}:rawPredict`
-
 #### 2. OpenRouter
-
-**Description:** Unified API gateway providing access to multiple LLM providers (Anthropic, OpenAI, Google, Meta, etc.).
 
 **Advantages:**
 - ✅ Access to 100+ models from different providers
 - ✅ Flexible pricing and model selection
-- ✅ Single API key for all models
-- ✅ Good for experimentation and comparison
 
 **Configuration:**
 ```bash
@@ -237,19 +239,11 @@ OPENROUTER_API_KEY=sk-or-v1-your-key
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 ```
 
-**Popular Models:**
-- `anthropic/claude-3.5-sonnet` - Best for legal analysis
-- `openai/gpt-4-turbo` - Strong general purpose
-- `meta-llama/llama-3.1-70b-instruct` - Open source option
-
 #### 3. OpenAI
 
-**Description:** Direct access to OpenAI's GPT models.
-
 **Advantages:**
-- ✅ Direct API access (no intermediary)
+- ✅ Direct API access
 - ✅ Latest GPT models
-- ✅ Well-documented and stable
 
 **Configuration:**
 ```bash
@@ -258,118 +252,108 @@ OPENAI_API_KEY=sk-your-openai-key
 LLM_MODEL=gpt-4-turbo-preview
 ```
 
-**Popular Models:**
-- `gpt-4-turbo-preview` - Most capable
-- `gpt-4` - Stable, reliable
-- `gpt-3.5-turbo` - Fast and economical
-
-#### Provider Comparison
-
-| Feature | Bosch LLM Farm | OpenRouter | OpenAI |
-|---------|----------------|------------|--------|
-| **Best For** | Bosch employees | Flexibility | Direct GPT access |
-| **Cost** | Internal (free) | Pay-per-use | Pay-per-use |
-| **Models** | Claude, Gemini | 100+ models | GPT models only |
-| **Compliance** | Bosch-approved | External service | External service |
-| **Setup** | Bosch credentials | API key | API key |
-
-### Authentication Setup
-
-#### For Google Cloud Deployment
-
-```bash
-# Install Google Cloud SDK
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
-
-# Enable required APIs
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable storage.googleapis.com
-```
-
-#### For Local Development
-
-```bash
-gcloud auth application-default login
-```
-
 ## Usage
 
 ### Starting the Server
 
-#### Local Development
 ```bash
+# Local Development
 python -m uvicorn app.main:app --reload --port 8080
-```
 
-#### Production
-```bash
+# Production
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-### Basic Operations
+### Web UI
 
-#### 1. Sync Documents
-Download and process all configured documents:
+Open `http://localhost:8080/ui` in your browser to access the web interface:
+
+**Dashboard** (`/ui`)
+- View all monitored documents
+- See change status and version counts
+- Add, edit, or remove documents
+- Trigger sync for all or individual documents
+
+**Document Detail** (`/ui/doc/{id}`)
+- View version timeline
+- Browse document content by version
+- Run AI analysis to compare versions
+- Download analysis as HTML
+
+### API
+
+#### Basic Operations
+
+**1. Sync Documents**
 ```bash
+# Sync all documents
 curl -X POST http://localhost:8080/sync
+
+# Sync specific documents
+curl -X POST "http://localhost:8080/sync" \
+  -H "Content-Type: application/json" \
+  -d '{"document_ids": ["github_terms"]}'
 ```
 
-Sync specific documents:
-```bash
-curl -X POST "http://localhost:8080/sync?document_ids=github_terms,openai_usage"
-```
-
-Force update (ignore cache):
-```bash
-curl -X POST "http://localhost:8080/sync?force=true"
-```
-
-#### 2. List Documents
+**2. List Documents**
 ```bash
 curl http://localhost:8080/tos
 ```
 
-#### 3. Get Document Details
+**3. Analyze Changes**
 ```bash
-curl http://localhost:8080/tos/github_terms
-```
-
-#### 4. Analyze Changes
-Generate AI-powered change analysis:
-```bash
-# Basic analysis (compares 'last' vs 'prev' versions)
+# Basic analysis
 curl -X POST http://localhost:8080/tos/github_terms \
   -H "Content-Type: application/json" \
   -d '{}'
 
-# Analysis with specific dates
+# With specific versions
 curl -X POST http://localhost:8080/tos/github_terms \
   -H "Content-Type: application/json" \
-  -d '{
-    "prev": "2024-01-15",
-    "last": "2024-02-28"
-  }'
+  -d '{"prev": "2024-01-15", "last": "2024-02-28"}'
 
-# Analysis with specific AI provider
-curl -X POST http://localhost:8080/tos/github_terms \
+# Get HTML output
+curl -X POST "http://localhost:8080/tos/github_terms?html=true" \
   -H "Content-Type: application/json" \
-  -d '{
-    "ai_provider": "openrouter"
-  }'
+  -d '{}'
 ```
 
-#### 5. Access Previous Versions
+**4. Manage Documents**
 ```bash
-# Get last version
-curl http://localhost:8080/tos/github_terms/last
+# Add a document
+curl -X POST http://localhost:8080/config/documents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "new_doc",
+    "name": "New Document",
+    "url": "https://example.com/terms",
+    "selector": "main"
+  }'
 
-# Get previous version
-curl http://localhost:8080/tos/github_terms/prev
+# Update a document
+curl -X PUT http://localhost:8080/config/documents/new_doc \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Name"}'
 
-# Get specific date version
-curl http://localhost:8080/tos/github_terms/2024-01-15
+# Delete a document
+curl -X DELETE http://localhost:8080/config/documents/new_doc
+```
+
+**5. Automated Scheduling (Optional)**
+
+Document syncing is manual by default. To automate it, use cron or Cloud Scheduler:
+
+```bash
+# Linux/macOS cron - sync daily at 9am
+# Add to crontab (crontab -e)
+0 9 * * * curl -X POST http://localhost:8080/sync
+
+# Google Cloud Scheduler
+gcloud scheduler jobs create http tos-monitor-sync \
+  --schedule="0 9 * * *" \
+  --uri="https://your-app.run.app/sync" \
+  --http-method=POST \
+  --location=us-central1
 ```
 
 ## API Documentation
@@ -379,112 +363,77 @@ curl http://localhost:8080/tos/github_terms/2024-01-15
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/` | Service information |
-| `GET` | `/health` | Health check with connectivity validation |
+| `GET` | `/health` | Health check |
 | `GET` | `/config` | Current configuration |
-| `GET` | `/docs` | Swagger/OpenAPI documentation |
+| `GET` | `/docs` | Swagger/OpenAPI docs |
 
-### Document Management
+### Web UI
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/ui` | Dashboard |
+| `GET` | `/ui/doc/{id}` | Document detail page |
+
+### Document Management (API)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/sync` | Download and process documents |
-| `GET` | `/tos` | List all documents with versions |
+| `GET` | `/tos` | List all documents |
 | `GET` | `/tos/{id}` | Get document details |
-| `GET` | `/tos/{id}/prev` | Get previous version content |
-| `GET` | `/tos/{id}/last` | Get last version content |
-| `GET` | `/tos/{id}/{date}` | Get specific dated version |
-| `POST` | `/tos/{id}` | AI-powered change analysis |
+| `GET` | `/tos/{id}/prev` | Previous version content |
+| `GET` | `/tos/{id}/last` | Last version content |
+| `GET` | `/tos/{id}/{date}` | Specific dated version |
+| `POST` | `/tos/{id}` | AI-powered analysis |
 
-### Query Parameters
+### Document Configuration (API)
 
-#### `/sync` endpoint
-- `document_ids`: Comma-separated list of document IDs
-- `force`: Boolean to ignore cache and force update
-
-#### AI Analysis (`POST /tos/{id}`)
-- **Request Body**: Optional JSON with `ai_provider`, `prev`, and `last` parameters
-- **Default Behavior**: Compares `last` version with `prev` version
-- **Response**: Plain text analysis (not JSON)
-- **Customizable**: Can specify exact dates or different AI provider per request
-
-#### Request Body for AI Analysis
-```json
-{
-  "ai_provider": "openrouter",  // Optional: "openai" or "openrouter"
-  "prev": "2024-01-15",        // Optional: specific date or "prev"
-  "last": "2024-02-28"         // Optional: specific date or "last"
-}
-```
-
-### Response Formats
-
-#### Document List Response
-```json
-{
-  "github_terms": {
-    "id": "github_terms",
-    "name": "GitHub Terms of Service",
-    "url": "https://docs.github.com/en/site-policy/...",
-    "current": "2024-03-15",
-    "last": "2024-02-28",
-    "prev": "2024-01-30",
-    "changed": true,
-    "total": 5,
-    "available_dates": ["2024-03-15", "2024-02-28", "2024-01-30", "2024-01-20", "2024-01-10"]
-  }
-}
-```
-
-#### AI Analysis Response
-Returns **plain text** analysis (not JSON):
-```
-Analysis of changes between GitHub Terms of Service versions:
-
-SUMMARY:
-The Terms of Service were updated to clarify data processing procedures and user responsibilities...
-
-KEY CHANGES:
-1. Data Processing Section:
-   - Added new clause about third-party data sharing
-   - Modified retention period from 30 to 90 days
-
-2. User Responsibilities:
-   - Enhanced content moderation guidelines
-   - New restrictions on automated access
-
-IMPACT ASSESSMENT:
-These changes primarily affect enterprise users who process user data...
-
-RECOMMENDATIONS:
-Users should review the new data processing terms and update their internal policies accordingly.
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/config/documents` | Add new document |
+| `PUT` | `/config/documents/{id}` | Update document |
+| `DELETE` | `/config/documents/{id}` | Remove document |
 
 ## Deployment
 
-### Google Cloud Run Deployment
+### Cloud Run Deployment
 
-#### Automated Deployment
+The project includes an interactive menu-driven deployment script:
 
-The project includes comprehensive deployment automation:
-
+**Interactive Deployment:**
 ```bash
-# Full deployment with build
+# Make sure you're authenticated
+gcloud auth login
+gcloud config set project your-project-id
+
+# Run interactive deployment
 ./deploy.sh
-
-# Test deployment (dry run)
-./deploy.sh --dry-run
-
-# Deploy without rebuilding
-./deploy.sh --skip-build
-
-# Deploy with local build
-./deploy.sh --local-build
 ```
 
-#### Manual Deployment
+This will guide you through:
+1. Select environment file (defaults to `.env.cloud`)
+2. Choose deployment mode (full/skip-build/dry-run)
+3. Select build method (Cloud Build or local Docker)
+4. Review and confirm
 
+**Non-Interactive Mode (for CI/automation):**
 ```bash
-# Build and submit to Cloud Build
+# Deploy with specific env file
+./deploy.sh --env .env.cloud --skip-menu
+
+# Dry run with custom env
+./deploy.sh --env .env.production --skip-menu --dry-run
+
+# Deploy without rebuilding
+./deploy.sh --env .env.cloud --skip-menu --skip-build
+
+# Local Docker build
+./deploy.sh --env .env.cloud --skip-menu --local-build
+```
+
+**Manual Deployment:**
+```bash
+# Build and push image
 gcloud builds submit --tag gcr.io/$GOOGLE_CLOUD_PROJECT/tos-monitor
 
 # Deploy to Cloud Run
@@ -495,36 +444,128 @@ gcloud run deploy tos-monitor \
     --allow-unauthenticated
 ```
 
-#### Environment Variables for Cloud Run
-
-Set environment variables in Cloud Run:
-
+**Set Environment Variables:**
 ```bash
 gcloud run services update tos-monitor \
     --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,STORAGE_BUCKET=$BUCKET_NAME,AI_PROVIDER=openrouter" \
     --set-secrets="OPENROUTER_API_KEY=openrouter-key:latest"
 ```
 
-### Storage Setup
+### GCS Upload
 
-#### Initialize Cloud Storage
-
-Upload existing data to Google Cloud Storage:
+Upload local data to Google Cloud Storage:
 
 ```bash
-python upload_to_gcs.py --bucket your-bucket-name
+# Install dependencies
+pip install google-cloud-storage
 
-# Dry run to test
-python upload_to_gcs.py --bucket your-bucket-name --dry-run
+# Authenticate
+gcloud auth application-default login
+
+# Dry run (preview)
+python upload_to_gcs.py --bucket tos-monitor --dry-run
+
+# Upload
+python upload_to_gcs.py --bucket tos-monitor
+
+# Custom data directory
+python upload_to_gcs.py --bucket tos-monitor --data-dir /path/to/data
 ```
 
-#### Local Storage Mode
+## Testing
 
-For development or testing, use local storage:
+### Quick Test (All-in-One)
 
 ```bash
-export STORAGE_MODE=local
-# Data will be stored in ./data/ directory
+#!/bin/bash
+# Test Bosch LLM Farm integration
+
+echo "🧪 Testing ToS Monitor with Bosch LLM Farm"
+
+# Test 1: Environment
+python3 -c "
+import os
+from dotenv import load_dotenv
+load_dotenv()
+assert os.getenv('AI_PROVIDER') == 'bosch-llm-farm'
+print('✅ Environment OK')
+"
+
+# Test 2: Client Init
+python3 -c "
+from app.llm_client import get_llm_client
+client = get_llm_client('bosch-llm-farm')
+assert client.provider == 'bosch-llm-farm'
+print('✅ Client initialization OK')
+"
+
+# Test 3: Connection
+python3 -c "
+from app.llm_client import get_llm_client
+import asyncio
+async def test():
+    client = get_llm_client('bosch-llm-farm')
+    result = await client.test_connection()
+    assert result, 'Connection failed'
+    print('✅ API connection OK')
+asyncio.run(test())
+"
+
+echo "🎉 All tests passed!"
+```
+
+### Step-by-Step Testing
+
+**1. Test Environment:**
+```bash
+python3 -c "
+import os
+from dotenv import load_dotenv
+load_dotenv()
+print(f'AI_PROVIDER: {os.getenv(\"AI_PROVIDER\")}')
+print(f'Model: {os.getenv(\"BOSCH_LLM_MODEL\")}')
+"
+```
+
+**2. Test Client Initialization:**
+```bash
+python3 -c "
+from app.llm_client import get_llm_client
+client = get_llm_client('bosch-llm-farm')
+print(f'Client: {client.__class__.__name__}')
+print(f'Model: {client.model}')
+"
+```
+
+**3. Test Connection:**
+```bash
+python3 -c "
+from app.llm_client import get_llm_client
+import asyncio
+async def test():
+    client = get_llm_client('bosch-llm-farm')
+    result = await client.test_connection()
+    print('✅ Connection successful' if result else '❌ Connection failed')
+asyncio.run(test())
+"
+```
+
+**4. Test Full Application:**
+```bash
+# Start server
+python3 -m uvicorn app.main:app --reload --port 8080
+
+# In another terminal:
+# Test health
+curl http://localhost:8080/health | jq
+
+# Test sync
+curl -X POST "http://localhost:8080/sync?document_ids=anthropic"
+
+# Test analysis
+curl -X POST http://localhost:8080/tos/anthropic \
+  -H "Content-Type: application/json" \
+  -d '{"ai_provider": "bosch-llm-farm"}'
 ```
 
 ## Development
@@ -533,32 +574,39 @@ export STORAGE_MODE=local
 
 ```
 tos-monitor/
-├── app/                    # Main application
-│   ├── main.py            # FastAPI application entry point
-│   ├── storage.py         # Storage abstraction layer
-│   ├── tos_client.py      # ToS analysis orchestrator
-│   ├── llm_client.py      # LLM client manager
-│   ├── routes/            # API endpoint definitions
-│   │   ├── fetch_docs.py  # Document fetching endpoints
-│   │   └── tos.py         # ToS management endpoints
-│   ├── clients/           # AI client implementations
-│   │   ├── base.py        # AI client protocol
+├── app/
+│   ├── main.py              # FastAPI application
+│   ├── storage.py           # Storage abstraction
+│   ├── tos_client.py        # Analysis orchestrator
+│   ├── llm_client.py        # LLM client manager
+│   ├── routes/              # API endpoints
+│   │   ├── fetch_docs.py    # Document fetching
+│   │   ├── tos.py           # ToS management
+│   │   ├── config.py        # Document configuration
+│   │   └── ui.py            # Web UI routes
+│   ├── clients/             # AI implementations
+│   │   ├── base.py
 │   │   ├── openai_client.py
-│   │   └── openrouter_client.py
-│   └── utils/             # Utility modules
-│       ├── html_parser.py # Web scraping
-│       ├── normalizer.py  # Text processing
-│       └── hashing.py     # Change detection
-├── config/                # Configuration files
-│   └── documents.json     # Document definitions
-├── data/                  # Local storage (when using local mode)
-├── .env                   # Environment variables (not in git)
-├── .env.example           # Environment template
-├── requirements.txt       # Python dependencies
-├── Dockerfile            # Container configuration
-├── deploy.sh             # Deployment wrapper
-├── deploy_to_cloudrun.py # Cloud Run deployment automation
-└── upload_to_gcs.py      # GCS upload utility
+│   │   ├── openrouter_client.py
+│   │   └── bosch_llm_farm_client.py
+│   ├── templates/           # Jinja2 templates
+│   │   ├── base.html
+│   │   ├── dashboard.html
+│   │   └── document.html
+│   └── utils/               # Utilities
+│       ├── html_parser.py
+│       ├── normalizer.py
+│       ├── hashing.py
+│       └── html_formatter.py
+├── config/
+│   └── documents.json       # Document definitions
+├── data/                    # Local storage
+├── .env                     # Environment variables
+├── .env.cloud               # Cloud deployment config
+├── requirements.txt
+├── Dockerfile
+├── deploy.sh                # Interactive deployment script
+└── upload_to_gcs.py
 ```
 
 ### Adding New AI Providers
@@ -589,338 +637,90 @@ tos-monitor/
    NEW_PROVIDER_API_KEY=your-key
    ```
 
-**Example Implementation:**
-See `app/clients/bosch_llm_farm_client.py` for a complete Anthropic API-based implementation with Bearer token authentication using the rawPredict endpoint pattern.
-
-### Running Tests
-
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio httpx
-
-# Run tests
-pytest
-```
-
-### Code Quality
-
-```bash
-# Format code
-black app/
-isort app/
-
-# Lint code
-flake8 app/
-mypy app/
-```
-
-## Examples
-
-### Example 1: Using Bosch LLM Farm (Claude Sonnet 4.5)
-
-```bash
-# Set up environment
-export AI_PROVIDER=bosch-llm-farm
-export ANTHROPIC_AUTH_TOKEN=your-token
-export BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
-export STORAGE_MODE=local
-
-# Configure document
-cat > config/documents.json << EOF
-{
-  "documents": [
-    {
-      "id": "github_tos",
-      "name": "GitHub Terms of Service",
-      "url": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
-      "selector": "article"
-    }
-  ]
-}
-EOF
-
-# Start the service
-python -m uvicorn app.main:app --reload --port 8080
-
-# In another terminal:
-# Sync the document
-curl -X POST http://localhost:8080/sync
-
-# Analyze changes with Bosch LLM Farm
-curl -X POST http://localhost:8080/tos/github_tos \
-  -H "Content-Type: application/json" \
-  -d '{"ai_provider": "bosch-llm-farm"}'
-
-# Get HTML formatted output
-curl -X POST "http://localhost:8080/tos/github_tos?html=true" \
-  -H "Content-Type: application/json" \
-  -d '{"ai_provider": "bosch-llm-farm"}'
-```
-
-### Example 2: Comparing AI Providers
-
-```bash
-# Analyze with different providers to compare results
-
-# Using Bosch LLM Farm (Claude)
-curl -X POST http://localhost:8080/tos/github_tos \
-  -H "Content-Type: application/json" \
-  -d '{"ai_provider": "bosch-llm-farm"}'
-
-# Using OpenRouter (also Claude)
-curl -X POST http://localhost:8080/tos/github_tos \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ai_provider": "openrouter"
-  }'
-
-# Using OpenAI (GPT-4)
-curl -X POST http://localhost:8080/tos/github_tos \
-  -H "Content-Type: application/json" \
-  -d '{"ai_provider": "openai"}'
-```
-
-### Example 3: Batch Processing Multiple Documents
-
-```bash
-# Configure multiple documents
-cat > config/documents.json << EOF
-{
-  "documents": [
-    {
-      "id": "github_tos",
-      "name": "GitHub Terms of Service",
-      "url": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service"
-    },
-    {
-      "id": "openai_usage",
-      "name": "OpenAI Usage Policies",
-      "url": "https://openai.com/policies/usage-policies"
-    }
-  ]
-}
-EOF
-
-# Sync all documents
-curl -X POST http://localhost:8080/sync
-
-# Get overview of all documents
-curl http://localhost:8080/tos
-```
-
-### Example 4: Automated Monitoring with Cron
-
-```bash
-# Add to crontab for daily monitoring
-0 9 * * * curl -X POST http://your-app.run.app/sync
-```
-
-### Example 5: Integration with External Systems
-
-```python
-import requests
-
-class ToSMonitor:
-    def __init__(self, base_url):
-        self.base_url = base_url
-
-    def sync_all(self):
-        response = requests.post(f"{self.base_url}/sync")
-        return response.json()
-
-    def analyze_document(self, doc_id):
-        response = requests.post(f"{self.base_url}/tos/{doc_id}")
-        return response.json()
-
-    def get_changes(self, doc_id):
-        analysis = self.analyze_document(doc_id)
-        return analysis.get("changes_detected", False)
-
-# Usage
-monitor = ToSMonitor("https://your-app.run.app")
-monitor.sync_all()
-
-if monitor.get_changes("github_tos"):
-    print("GitHub ToS has changed!")
-```
-
 ## Troubleshooting
 
 ### Common Issues
 
-#### 1. Authentication Errors
+#### Authentication Errors
 
 ```bash
 # Check Google Cloud authentication
 gcloud auth list
-gcloud auth application-default print-access-token
-
-# Re-authenticate if needed
 gcloud auth application-default login
 ```
 
-#### 2. Storage Permission Issues
+#### Storage Permission Issues
 
 ```bash
-# Check bucket permissions
+# Check bucket access
 gsutil ls gs://your-bucket-name
-gsutil iam get gs://your-bucket-name
 
-# Grant storage access to Cloud Run service account
+# Grant permissions
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SERVICE_ACCOUNT" \
     --role="roles/storage.objectAdmin"
 ```
 
-#### 3. Document Fetching Failures
-
-Check the logs for specific errors:
-
-```bash
-# Local development
-tail -f logs/app.log
-
-# Cloud Run
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=tos-monitor"
-```
-
-Common causes:
-- **Network restrictions**: Target site blocking requests
-- **Content selector issues**: CSS selector not matching content
-- **Rate limiting**: Too frequent requests to target site
-
-#### 4. AI Provider Issues
-
-```bash
-# Test AI provider connectivity
-curl -X POST http://localhost:8080/health
-```
-
-Check for:
-- **API key validity**: Ensure keys are correctly set and not expired
-- **Model availability**: Verify the specified model is available
-- **Rate limits**: Check if you've hit provider rate limits
-
-#### 5. Bosch LLM Farm Specific Issues
+#### Bosch LLM Farm Issues
 
 **Authentication Failed (401/403):**
 ```bash
-# Verify your token
+# Verify token
 echo $ANTHROPIC_AUTH_TOKEN
 
-# Test connection manually
+# Test manually
 curl -X POST "https://aoai-farm.bosch-temp.com/api/google/v1/publishers/anthropic/models/claude-sonnet-4-5@20250929:rawPredict" \
   -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"anthropic_version":"vertex-2023-10-16","messages":[{"role":"user","content":"Hello!"}],"max_tokens": 10}'
+  -d '{"anthropic_version":"vertex-2023-10-16","messages":[{"role":"user","content":"Hello"}],"max_tokens":10}'
 ```
 
 **Model Not Found (404):**
-- Verify the model name is correct: `claude-sonnet-4-5@20250929`
+- Verify model name: `claude-sonnet-4-5@20250929`
 - Check available models in Bosch LLM Farm portal
-- Ensure the model version suffix is included (e.g., `@20250929`)
 
-**Common Bosch LLM Farm Models:**
-```bash
-# Claude models (recommended for legal analysis)
-BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929  # Latest Sonnet
-BOSCH_LLM_MODEL=claude-haiku-4-5@20251001   # Faster, cheaper
+#### Document Fetching Failures
 
-# Gemini models (also available)
-BOSCH_LLM_MODEL=gemini-1.5-pro
-BOSCH_LLM_MODEL=gemini-1.5-flash
-```
-
-**Endpoint Issues:**
-- Default endpoint: `https://aoai-farm.bosch-temp.com/api/google/v1`
-- Can be overridden with `BOSCH_LLM_BASE_URL` environment variable
-- Ensure you're on Bosch network or VPN
+Common causes:
+- **Network restrictions**: Target site blocking requests
+- **Content selector issues**: CSS selector not matching
+- **Rate limiting**: Too frequent requests
 
 ### Debug Mode
-
-Enable debug mode for verbose logging:
 
 ```bash
 export DEBUG=true
 export LOG_LEVEL=DEBUG
+python -m uvicorn app.main:app --reload
 ```
 
-### Health Checks
+### Health Check
 
-The `/health` endpoint provides comprehensive health information:
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-03-15T10:30:00Z",
-  "checks": {
-    "storage": "healthy",
-    "ai_provider": "healthy",
-    "configuration": "healthy"
-  },
-  "version": "1.0.0"
-}
+```bash
+curl http://localhost:8080/health | jq
 ```
 
 ## Contributing
 
-We welcome contributions! Please follow these guidelines:
-
-### Development Setup
-
 1. **Fork the repository**
-2. **Clone your fork**
+2. **Create a feature branch**
    ```bash
-   git clone https://github.com/your-username/tos-monitor.git
+   git checkout -b feature/your-feature
    ```
-3. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-4. **Install development dependencies**
-   ```bash
-   pip install -r requirements.txt
-   pip install black isort flake8 mypy pytest
-   ```
-
-### Code Standards
-
-- **Format code** with `black` and `isort`
-- **Follow PEP 8** style guidelines
-- **Add type hints** for all functions
-- **Write tests** for new functionality
-- **Update documentation** for API changes
-
-### Submitting Changes
-
-1. **Run tests**
+3. **Make changes and test**
    ```bash
    pytest
-   ```
-2. **Format code**
-   ```bash
    black app/
    isort app/
    ```
-3. **Commit changes**
+4. **Commit changes**
    ```bash
-   git commit -m "feat: add new feature description"
+   git commit -m "feat: add new feature"
    ```
-4. **Push to your fork**
+5. **Push and create PR**
    ```bash
-   git push origin feature/your-feature-name
+   git push origin feature/your-feature
    ```
-5. **Create a Pull Request**
-
-### Reporting Issues
-
-Please use the GitHub issue tracker to report bugs or request features. Include:
-
-- **Clear description** of the issue
-- **Steps to reproduce** (for bugs)
-- **Expected vs actual behavior**
-- **Environment details** (Python version, OS, etc.)
-- **Relevant logs** or error messages
 
 ## License
 
@@ -930,10 +730,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-For support and questions:
-
-- **Documentation**: Check the `/docs` endpoint when running the service
+- **Documentation**: Check `/docs` endpoint when running the service
 - **Issues**: Report bugs via GitHub Issues
-- **Discussions**: Use GitHub Discussions for general questions
+- **Web UI**: Access at `/ui` for browser-friendly interface
 
 Built with ❤️ using FastAPI, Google Cloud, and AI technologies.
