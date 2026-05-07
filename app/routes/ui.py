@@ -39,8 +39,9 @@ async def dashboard(request: Request):
         pass
 
     return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request, "documents": documents},
+        request=request,
+        name="dashboard.html",
+        context={"documents": documents},
     )
 
 
@@ -71,6 +72,7 @@ async def document_detail(request: Request, document_id: str):
             "available_dates": [],
         }
     return templates.TemplateResponse(
-        "document.html",
-        {"request": request, "doc": doc},
+        request=request,
+        name="document.html",
+        context={"doc": doc},
     )

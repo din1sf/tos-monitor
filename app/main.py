@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="ToS Monitor",
     description="A serverless Terms of Service monitoring service that automatically tracks changes in legal documents",
-    version="1.0.0",
+    version=os.getenv("APP_VERSION", "1.0.0"),
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -65,7 +65,7 @@ async def root():
     return {
         "service": "ToS Monitor",
         "description": "Terms of Service monitoring service",
-        "version": "1.0.0",
+        "version": os.getenv("APP_VERSION", "1.0.0"),
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "endpoints": {
