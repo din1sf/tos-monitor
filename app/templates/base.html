@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ToS Monitor{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --border: #dee2e6;
+            --text: #212529;
+            --text-muted: #6c757d;
+            --primary: #0d6efd;
+            --primary-hover: #0b5ed7;
+            --success: #198754;
+            --warning: #fd7e14;
+            --danger: #dc3545;
+            --radius: 6px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        nav .brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+            text-decoration: none;
+        }
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        nav a:hover { color: var(--primary); }
+        nav .health-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        nav .health-dot.healthy { background: var(--success); }
+        nav .health-dot.unhealthy { background: var(--danger); }
+        .container {
+            max-width: 1100px;
+            margin: 1.5rem auto;
+            padding: 0 1.5rem;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+        h2 { font-size: 1.25rem; margin-bottom: 0.75rem; }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.4rem 0.85rem;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn:hover { border-color: var(--primary); color: var(--primary); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        .btn-primary:hover { background: var(--primary-hover); color: #fff; }
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 999px;
+            background: var(--bg);
+            color: var(--text-muted);
+        }
+        .badge-changed {
+            background: #fff3cd;
+            color: #664d03;
+        }
+        .chip {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.8rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            background: var(--surface);
+            color: var(--text-muted);
+        }
+        .chip:hover, .chip.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #e7f1ff;
+        }
+        .action-menu {
+            position: relative;
+            display: inline-block;
+        }
+        .action-menu-btn {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 0.2rem 0.45rem;
+            color: var(--text-muted);
+            line-height: 1;
+            letter-spacing: 1px;
+        }
+        .action-menu-btn:hover {
+            background: var(--bg);
+            border-color: var(--border);
+        }
+        .action-menu-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 2px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-width: 120px;
+            z-index: 20;
+            overflow: hidden;
+        }
+        .action-menu.open .action-menu-dropdown { display: block; }
+        .action-menu-dropdown a {
+            display: block;
+            padding: 0.45rem 0.85rem;
+            font-size: 0.85rem;
+            color: var(--text);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .action-menu-dropdown a:hover { background: var(--bg); }
+        .action-menu-dropdown a.danger { color: var(--danger); }
+        .action-menu-dropdown a.danger:hover { background: #fff5f5; }
+        .text-muted { color: var(--text-muted); font-size: 0.85rem; }
+        .mono { font-family: "SF Mono", "Consolas", monospace; font-size: 0.85rem; }
+        .flex { display: flex; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .gap-sm { gap: 0.5rem; }
+        .gap-md { gap: 0.75rem; }
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mb-1 { margin-bottom: 0.5rem; }
+        pre.content-preview {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .analysis-output {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            line-height: 1.7;
+        }
+        .analysis-output h1, .analysis-output h2, .analysis-output h3 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .analysis-output h1:first-child, .analysis-output h2:first-child {
+            margin-top: 0;
+        }
+        .analysis-output ul, .analysis-output ol {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        .analysis-output li { margin-bottom: 0.25rem; }
+        .analysis-output p { margin-bottom: 0.5rem; }
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--text);
+            color: #fff;
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+        .toast.show { opacity: 1; }
+        select {
+            padding: 0.35rem 0.6rem;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a class="brand" href="/ui">ToS Monitor</a>
+        <a href="/ui">Dashboard</a>
+        <a href="/docs" target="_blank">API Docs</a>
+        <div class="health-dot" id="health-dot" title="Checking..."></div>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    <div class="toast" id="toast"></div>
+    <script>
+        function showToast(msg, duration = 3000) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), duration);
+        }
+
+        async function apiFetch(url, opts = {}) {
+            const res = await fetch(url, opts);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || res.statusText);
+            }
+            return res;
+        }
+
+        fetch('/health')
+            .then(r => r.json())
+            .then(d => {
+                const dot = document.getElementById('health-dot');
+                dot.classList.add(d.status === 'healthy' ? 'healthy' : 'unhealthy');
+                dot.title = d.status;
+            })
+            .catch(() => {
+                document.getElementById('health-dot').classList.add('unhealthy');
+            });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
