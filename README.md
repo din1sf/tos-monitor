@@ -52,7 +52,7 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 
 ## Quick Start
 
-**For Bosch Users:** Get started in 5 minutes using Bosch LLM Farm (Claude Sonnet 4.5).
+**Quick Start Example:** Get started in 5 minutes using Bosch LLM Farm (Claude Sonnet 4.5).
 
 ```bash
 # 1. Clone and install
@@ -138,7 +138,7 @@ STORAGE_MODE=local  # or 'cloud' for Google Cloud Storage
 
 # AI Provider Configuration (choose one of the three options below)
 
-# Option 1: Bosch LLM Farm (Recommended for Bosch internal use)
+# Option 1: Bosch LLM Farm (For Bosch internal use)
 AI_PROVIDER=bosch-llm-farm
 ANTHROPIC_AUTH_TOKEN=your-bosch-auth-token
 BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929
@@ -211,13 +211,14 @@ Edit `config/documents.json`:
 
 The ToS Monitor supports three AI providers:
 
-#### 1. Bosch LLM Farm (Recommended for Bosch Users)
+#### 1. Bosch LLM Farm
 
 **Advantages:**
 - ✅ Pre-approved for Bosch internal use
-- ✅ No external API costs
 - ✅ Compliance with Bosch security policies
 - ✅ Access to latest Claude models (Sonnet 4.5)
+
+**Note:** This option incurs API costs through Bosch LLM Farm
 
 **Configuration:**
 ```bash
