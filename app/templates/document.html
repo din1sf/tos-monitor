@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}{{ doc.name }} - ToS Monitor{% endblock %}
+
+{% block content %}
+<div class="mb-1">
+    <a href="/ui" class="text-muted" style="text-decoration:none;">&larr; Dashboard</a>
+</div>
+
+<div class="flex-between mb-1">
+    <div>
+        <h1 style="margin-bottom:0.25rem;">{{ doc.name }}</h1>
+        <a href="{{ doc.url }}" target="_blank" class="text-muted" style="word-break:break-all;">{{ doc.url }}</a>
+    </div>
+    <div class="flex gap-sm" style="align-items:center;">
+        {% if doc.changed %}
+            <span class="badge badge-changed">Changed</span>
+        {% endif %}
+        <button class="btn" onclick="syncThis()">Sync</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="flex-between">
+        <h2>Version Timeline</h2>
+        <span class="text-muted">{{ doc.total }} version{{ 's' if doc.total != 1 }}</span>
+    </div>
+    <div class="mt-1 flex gap-sm" style="flex-wrap:wrap;">
+        {% for date in doc.available_dates %}
+        <span class="chip {% if date == doc.last %}active{% endif %}"
+              onclick="loadVersion('{{ date }}', this)"
+              title="{% if date == doc.last %}last{% elif date == doc.prev %}prev{% endif %}">
+            {{ date }}
+            {% if date == doc.last %}<small>(last)</small>{% endif %}
+            {% if date == doc.prev %}<small>(prev)</small>{% endif %}
+        </span>
+        {% endfor %}
+        {% if not doc.available_dates %}
+        <span class="text-muted">No versions stored yet. Run a sync first.</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mt-1">
+    <div class="flex-between">
+        <h2>Version Content</h2>
+        <span class="text-muted" id="version-label">Select a version above</span>
+    </div>
+    <pre class="content-preview mt-1" id="content-preview">Click a version date above to view its content.</pre>
+</div>
+
+<div class="card mt-1">
+    <h2>Change Analysis</h2>
+    <div class="flex gap-sm mt-1" style="align-items:center; flex-wrap:wrap;">
+        <label class="text-muted">Compare</label>
+        <select id="prev-select">
+            <option value="prev">prev (default)</option>
+            {% for date in doc.available_dates %}
+            <option value="{{ date }}">{{ date }}</option>
+            {% endfor %}
+        </select>
+        <span class="text-muted">vs</span>
+        <select id="last-select">
+            <option value="last">last (default)</option>
+            {% for date in doc.available_dates %}
+            <option value="{{ date }}">{{ date }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-primary" id="analyze-btn" onclick="analyze()">Analyze Changes</button>
+    </div>
+    <div id="analysis-container" class="mt-2" style="display:none;">
+        <div class="flex-between mb-1">
+            <span></span>
+            <button class="btn" id="download-btn" style="display:none;" onclick="downloadAnalysis()">Download HTML</button>
+        </div>
+        <div class="analysis-output" id="analysis-output"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const DOC_ID = '{{ doc.id }}';
+    const DOC_NAME = '{{ doc.name | e }}';
+
+    async function loadVersion(date, chipEl) {
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        if (chipEl) chipEl.classList.add('active');
+
+        const preview = document.getElementById('content-preview');
+        const label = document.getElementById('version-label');
+        preview.textContent = 'Loading...';
+        label.textContent = date;
+
+        try {
+            const res = await apiFetch(`/tos/${DOC_ID}/${date}`);
+            const text = await res.text();
+            preview.textContent = text || '(empty)';
+        } catch (e) {
+            preview.textContent = 'Error: ' + e.message;
+        }
+    }
+
+    async function analyze() {
+        const btn = document.getElementById('analyze-btn');
+        const container = document.getElementById('analysis-container');
+        const output = document.getElementById('analysis-output');
+        const prevVal = document.getElementById('prev-select').value;
+        const lastVal = document.getElementById('last-select').value;
+
+        const dlBtn = document.getElementById('download-btn');
+        dlBtn.style.display = 'none';
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+        container.style.display = 'block';
+        output.innerHTML = '<span class="text-muted">Waiting for AI analysis... This may take a moment.</span>';
+
+        try {
+            const res = await apiFetch(`/tos/${DOC_ID}?html=true`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prev: prevVal, last: lastVal })
+            });
+            const html = await res.text();
+            output.innerHTML = html;
+            dlBtn.style.display = '';
+        } catch (e) {
+            output.innerHTML = `<p style="color:var(--danger);">Analysis failed: ${e.message}</p>`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Analyze Changes';
+        }
+    }
+
+    function downloadAnalysis() {
+        const content = document.getElementById('analysis-output').innerHTML;
+        const prevVal = document.getElementById('prev-select').value;
+        const lastVal = document.getElementById('last-select').value;
+        const title = `${DOC_NAME} — Analysis (${prevVal} vs ${lastVal})`;
+        const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:800px;margin:2rem auto;padding:0 1.5rem;color:#212529;line-height:1.7;}
+h1{font-size:1.4rem;border-bottom:1px solid #dee2e6;padding-bottom:0.5rem;}
+h2{font-size:1.15rem;margin-top:1.5rem;}
+h3{font-size:1rem;margin-top:1rem;}
+ul,ol{padding-left:1.5rem;margin:0.5rem 0;}
+li{margin-bottom:0.25rem;}
+p{margin-bottom:0.5rem;}
+.meta{color:#6c757d;font-size:0.85rem;margin-bottom:1.5rem;}
+</style></head><body>
+<h1>${title}</h1>
+<div class="meta">Generated ${new Date().toISOString().slice(0,10)} by ToS Monitor</div>
+${content}
+</body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${DOC_ID}_analysis_${prevVal}_vs_${lastVal}.html`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    async function syncThis() {
+        try {
+            await apiFetch('/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ document_ids: [DOC_ID] })
+            });
+            showToast('Synced successfully');
+            setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+            showToast('Sync failed: ' + e.message);
+        }
+    }
+</script>
+{% endblock %}

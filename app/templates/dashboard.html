@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ToS Monitor{% endblock %}
+
+{% block content %}
+<div class="flex-between mb-1">
+    <h1>Monitored Documents</h1>
+    <div class="flex gap-sm">
+        <button class="btn" onclick="openAddModal()">+ Add Document</button>
+        <button class="btn btn-primary" id="sync-all-btn" onclick="syncAll()">Sync All</button>
+    </div>
+</div>
+
+{% if documents %}
+<table style="width:100%; border-collapse:collapse;">
+    <thead>
+        <tr style="text-align:left; border-bottom:2px solid var(--border);">
+            <th style="padding:0.5rem 0.75rem;">Name</th>
+            <th style="padding:0.5rem 0.75rem;">Status</th>
+            <th style="padding:0.5rem 0.75rem;">Last Version</th>
+            <th style="padding:0.5rem 0.75rem;">Versions</th>
+            <th style="padding:0.5rem 0.75rem;"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for doc_id, doc in documents.items() %}
+        <tr style="border-bottom:1px solid var(--border);" id="row-{{ doc_id }}">
+            <td style="padding:0.6rem 0.75rem;">
+                <a href="/ui/doc/{{ doc_id }}" style="color:var(--primary); text-decoration:none; font-weight:500;">
+                    {{ doc.name }}
+                </a>
+                <div class="text-muted" style="font-size:0.75rem; max-width:350px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <a href="{{ doc.url }}" target="_blank" style="color:var(--text-muted);">{{ doc.url }}</a>
+                </div>
+            </td>
+            <td style="padding:0.6rem 0.75rem;">
+                {% if doc.changed %}
+                    <span class="badge badge-changed">Changed</span>
+                {% else %}
+                    <span class="badge">No changes</span>
+                {% endif %}
+            </td>
+            <td style="padding:0.6rem 0.75rem;">
+                <span class="mono">{{ doc.last or doc.current or '-' }}</span>
+            </td>
+            <td style="padding:0.6rem 0.75rem;">
+                <span class="badge">{{ doc.total }}</span>
+            </td>
+            <td style="padding:0.6rem 0.75rem; text-align:right;">
+                <div class="flex gap-sm" style="justify-content:flex-end; align-items:center;">
+                    <button class="btn" onclick="syncDoc('{{ doc_id }}', this)">Sync</button>
+                    <div class="action-menu">
+                        <button class="action-menu-btn" onclick="toggleMenu(this)" title="Actions">&#8942;</button>
+                        <div class="action-menu-dropdown">
+                            <a href="#" onclick="event.preventDefault(); closeMenus(); openEditModal('{{ doc_id }}', '{{ doc.name | e }}', '{{ doc.url | e }}', '{{ doc.selector | default("", true) | e }}')">Edit</a>
+                            <a href="#" class="danger" onclick="event.preventDefault(); closeMenus(); deleteDoc('{{ doc_id }}', '{{ doc.name | e }}')">Remove</a>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card">
+    <p class="text-muted">No documents configured. Click "Add Document" to get started.</p>
+</div>
+{% endif %}
+
+<!-- Add/Edit Modal -->
+<div id="doc-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50; align-items:center; justify-content:center;">
+    <div class="card" style="width:100%; max-width:500px; margin:auto;">
+        <div class="flex-between mb-1">
+            <h2 id="modal-title">Add Document</h2>
+            <button class="btn" onclick="closeModal()" style="border:none; font-size:1.2rem; padding:0.2rem 0.5rem;">&times;</button>
+        </div>
+        <form id="doc-form" onsubmit="submitForm(event)">
+            <input type="hidden" id="form-mode" value="add">
+            <input type="hidden" id="form-original-id" value="">
+            <div style="margin-bottom:0.75rem;">
+                <label class="text-muted" style="display:block; margin-bottom:0.25rem;">ID</label>
+                <input type="text" id="form-id" required pattern="[a-zA-Z0-9_-]+"
+                       style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:var(--radius); font-size:0.9rem;"
+                       placeholder="e.g. my_service_tos">
+                <div class="text-muted" style="font-size:0.7rem; margin-top:0.15rem;">Letters, numbers, underscores, hyphens only</div>
+            </div>
+            <div style="margin-bottom:0.75rem;">
+                <label class="text-muted" style="display:block; margin-bottom:0.25rem;">Name</label>
+                <input type="text" id="form-name" required
+                       style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:var(--radius); font-size:0.9rem;"
+                       placeholder="e.g. My Service Terms of Service">
+            </div>
+            <div style="margin-bottom:0.75rem;">
+                <label class="text-muted" style="display:block; margin-bottom:0.25rem;">URL</label>
+                <input type="url" id="form-url" required
+                       style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:var(--radius); font-size:0.9rem;"
+                       placeholder="https://example.com/terms">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label class="text-muted" style="display:block; margin-bottom:0.25rem;">CSS Selector <span style="font-size:0.7rem;">(optional)</span></label>
+                <input type="text" id="form-selector"
+                       style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:var(--radius); font-size:0.9rem;"
+                       placeholder="e.g. main, .content, #terms">
+            </div>
+            <div class="flex gap-sm" style="justify-content:flex-end;">
+                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="form-submit">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openAddModal() {
+        document.getElementById('modal-title').textContent = 'Add Document';
+        document.getElementById('form-mode').value = 'add';
+        document.getElementById('form-original-id').value = '';
+        document.getElementById('form-id').value = '';
+        document.getElementById('form-id').disabled = false;
+        document.getElementById('form-name').value = '';
+        document.getElementById('form-url').value = '';
+        document.getElementById('form-selector').value = '';
+        document.getElementById('form-submit').textContent = 'Add';
+        document.getElementById('doc-modal').style.display = 'flex';
+    }
+
+    function openEditModal(id, name, url, selector) {
+        document.getElementById('modal-title').textContent = 'Edit Document';
+        document.getElementById('form-mode').value = 'edit';
+        document.getElementById('form-original-id').value = id;
+        document.getElementById('form-id').value = id;
+        document.getElementById('form-id').disabled = true;
+        document.getElementById('form-name').value = name;
+        document.getElementById('form-url').value = url;
+        document.getElementById('form-selector').value = selector || '';
+        document.getElementById('form-submit').textContent = 'Save';
+        document.getElementById('doc-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('doc-modal').style.display = 'none';
+    }
+
+    async function submitForm(e) {
+        e.preventDefault();
+        const mode = document.getElementById('form-mode').value;
+        const btn = document.getElementById('form-submit');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+
+        const payload = {
+            id: document.getElementById('form-id').value.trim(),
+            name: document.getElementById('form-name').value.trim(),
+            url: document.getElementById('form-url').value.trim(),
+            selector: document.getElementById('form-selector').value.trim() || null,
+        };
+
+        try {
+            if (mode === 'add') {
+                await apiFetch('/config/documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                showToast('Document added');
+            } else {
+                const docId = document.getElementById('form-original-id').value;
+                await apiFetch(`/config/documents/${docId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                showToast('Document updated');
+            }
+            setTimeout(() => location.reload(), 1000);
+        } catch (e) {
+            showToast('Error: ' + e.message);
+            btn.disabled = false;
+            btn.textContent = mode === 'add' ? 'Add' : 'Save';
+        }
+    }
+
+    async function deleteDoc(docId, docName) {
+        if (!confirm(`Remove "${docName}" from monitoring?\n\nThis removes the document from the configuration. Stored versions are not deleted.`)) return;
+        try {
+            await apiFetch(`/config/documents/${docId}`, { method: 'DELETE' });
+            showToast('Document removed');
+            setTimeout(() => location.reload(), 1000);
+        } catch (e) {
+            showToast('Error: ' + e.message);
+        }
+    }
+
+    async function syncAll() {
+        const btn = document.getElementById('sync-all-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Syncing...';
+        try {
+            const res = await apiFetch('/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            showToast(`Synced ${data.success_count}/${data.processed_count} documents`);
+            setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+            showToast('Sync failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Sync All';
+        }
+    }
+
+    async function syncDoc(docId, btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+            await apiFetch('/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ document_ids: [docId] })
+            });
+            showToast(`Synced ${docId}`);
+            setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+            showToast('Sync failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Sync';
+        }
+    }
+
+    function closeMenus() {
+        document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+    }
+
+    function toggleMenu(btn) {
+        const menu = btn.parentElement;
+        const wasOpen = menu.classList.contains('open');
+        closeMenus();
+        if (!wasOpen) menu.classList.add('open');
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.action-menu')) closeMenus();
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('doc-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+</script>
+{% endblock %}

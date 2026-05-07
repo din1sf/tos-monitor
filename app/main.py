@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routes import fetch_docs, tos
+from app.routes import fetch_docs, tos, ui, config
 from app.storage import get_storage_client
 from app.llm_client import get_llm_client
 
@@ -53,6 +53,8 @@ app.add_middleware(
 # Include routers
 app.include_router(fetch_docs.router, tags=["Document Fetching"])
 app.include_router(tos.router, tags=["ToS Documents"])
+app.include_router(config.router, tags=["Document Configuration"])
+app.include_router(ui.router, tags=["Web UI"])
 
 
 @app.get("/", response_model=Dict[str, Any])
