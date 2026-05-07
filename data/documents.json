@@ -3,7 +3,55 @@
     {
       "id": "anthropic",
       "name": "Anthropic Commercial Terms",
-      "url": "https://www.anthropic.com/legal/commercial-terms",
+      "url": "https://www.anthropic.com/legal/commercial-terms?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_marketplace_tos",
+      "name": "GCP Marketplace Terms of Service",
+      "url": "https://cloud.google.com/terms/marketplace/launcher?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_service_terms",
+      "name": "GCP Service-Specific Terms",
+      "url": "https://cloud.google.com/terms/service-terms?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_acceptable_use_policy",
+      "name": "GCP Acceptable Use Policy",
+      "url": "https://cloud.google.com/terms/aup?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_generative_ai_use_policy",
+      "name": "GCP Generative AI Use Library",
+      "url": "https://policies.google.com/terms/generative-ai/use-policy?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_sla",
+      "name": "GCP Service Level Agreements",
+      "url": "https://cloud.google.com/terms/sla/?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_technical_support_services",
+      "name": "GCP Technical Support Services Guidelines",
+      "url": "https://cloud.google.com/terms/tssg?hl=en",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_data_processing_addendum_customers",
+      "name": "GCP Data Processing Addendum (Customers)",
+      "url": "https://cloud.google.com/terms/data-processing-addendum",
+      "selector": "main"
+    },
+    {
+      "id": "gcp_data_processing_addendum_partners",
+      "name": "GCP Data Processing Addendum (Partners)",
+      "url": "https://cloud.google.com/terms/partners-data-processing-addendum?hl=en",
       "selector": "main"
     }
   ]

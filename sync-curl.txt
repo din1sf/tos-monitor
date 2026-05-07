@@ -1,0 +1,55 @@
+# ============================================================
+# ToS Monitor - Cloud Run Test & Sync Endpoints
+# ============================================================
+# Service URL: https://tos-monitor-389635339946.europe-west3.run.app
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+curl https://tos-monitor-389635339946.europe-west3.run.app/health | jq .
+
+# ============================================================
+# SYNC ALL DOCUMENTS
+# ============================================================
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/sync -H "Content-Type: application/json" -d '{}'
+
+# ============================================================
+# GET DOCUMENT (Example)
+# ============================================================
+curl https://tos-monitor-389635339946.europe-west3.run.app/tos/anthropic | jq .
+
+# ============================================================
+# POST REQUESTS FOR ALL DOCUMENTS (Trigger Analysis)
+# ============================================================
+
+# 1. Anthropic Commercial Terms
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/anthropic -H "Content-Type: application/json" -d '{}'
+
+# 2. GCP Marketplace Terms of Service
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_marketplace_tos -H "Content-Type: application/json" -d '{}'
+
+# 3. GCP Service-Specific Terms
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_service_terms -H "Content-Type: application/json" -d '{}'
+
+# 4. GCP Acceptable Use Policy
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_acceptable_use_policy -H "Content-Type: application/json" -d '{}'
+
+# 5. GCP Generative AI Use Library
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_generative_ai_use_policy -H "Content-Type: application/json" -d '{}'
+
+# 6. GCP Service Level Agreements
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_sla -H "Content-Type: application/json" -d '{}'
+
+# 7. GCP Technical Support Services Guidelines
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_technical_support_services -H "Content-Type: application/json" -d '{}'
+
+# 8. GCP Data Processing Addendum (Customers)
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_data_processing_addendum_customers -H "Content-Type: application/json" -d '{}'
+
+# 9. GCP Data Processing Addendum (Partners)
+curl -X POST https://tos-monitor-389635339946.europe-west3.run.app/tos/gcp_data_processing_addendum_partners -H "Content-Type: application/json" -d '{}'
+
+# ============================================================
+# LOCAL TESTING (when running on localhost:8080)
+# ============================================================
+# curl -X POST http://localhost:8080/sync -H "Content-Type: application/json" -d '{}'
