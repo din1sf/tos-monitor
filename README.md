@@ -112,8 +112,8 @@ For other providers (OpenAI, OpenRouter), see [Configuration](#configuration).
 
 4. **Configure documents**
    ```bash
-   # Edit config/documents.json with your target documents
-   # Or use the web UI to add documents
+   # Edit data/documents.json with your target documents
+   # Or use the web UI to add documents (recommended)
    ```
 
 ### Docker Setup
@@ -186,7 +186,7 @@ Documents can be configured in two ways:
 - Use "Edit" and "Remove" from the three-dot menu for each document
 
 #### 2. Via JSON file
-Edit `config/documents.json`:
+Edit `data/documents.json`:
 
 ```json
 {
@@ -599,9 +599,8 @@ tos-monitor/
 │       ├── normalizer.py
 │       ├── hashing.py
 │       └── html_formatter.py
-├── config/
+├── data/
 │   └── documents.json       # Document definitions
-├── data/                    # Local storage
 ├── .env                     # Environment variables
 ├── .env.cloud               # Cloud deployment config
 ├── requirements.txt
