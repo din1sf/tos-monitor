@@ -7,6 +7,8 @@ from fastapi.templating import Jinja2Templates
 
 from fastapi import HTTPException
 
+import re
+
 from app.storage import get_storage_client
 from app.routes.tos import list_tos_documents, get_tos_document
 
@@ -75,4 +77,20 @@ async def document_detail(request: Request, document_id: str):
         request=request,
         name="document.html",
         context={"doc": doc},
+    )
+
+
+@router.get("/prompt", response_class=HTMLResponse)
+async def prompt_editor(request: Request):
+    storage = get_storage_client()
+    content = await storage.load_prompt() or ""
+    files = await storage.list_files(prefix="")
+    versions = sorted(
+        [m.group(1) for f in files if (m := re.search(r"prompt-(\d{4}-\d{2}-\d{2})\.txt", f))],
+        reverse=True,
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="prompt.html",
+        context={"prompt_content": content, "versions": versions},
     )

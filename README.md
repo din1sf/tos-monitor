@@ -285,6 +285,14 @@ Open `http://localhost:8080/ui` in your browser to access the web interface:
 - Run AI analysis to compare versions
 - Download analysis as HTML
 
+**Prompt Editor** (`/ui/prompt`)
+- View and edit the LLM analysis prompt template
+- Preview mode with placeholder highlighting (`{document_name}`, `{previous_content}`, etc.)
+- Save changes with automatic version snapshots
+- Upload a prompt from a `.txt` or `.md` file
+- Download the current prompt as a file
+- Version history with restore capability
+
 ### API
 
 #### Basic Operations
@@ -378,6 +386,7 @@ gcloud scheduler jobs create http tos-monitor-sync \
 |--------|----------|-------------|
 | `GET` | `/ui` | Dashboard |
 | `GET` | `/ui/doc/{id}` | Document detail page |
+| `GET` | `/ui/prompt` | Prompt template editor |
 
 ### Document Management (API)
 
@@ -398,6 +407,15 @@ gcloud scheduler jobs create http tos-monitor-sync \
 | `POST` | `/config/documents` | Add new document |
 | `PUT` | `/config/documents/{id}` | Update document |
 | `DELETE` | `/config/documents/{id}` | Remove document |
+
+### Prompt Management (API)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/prompt` | Get current prompt template |
+| `PUT` | `/prompt` | Save prompt (auto-creates version backup) |
+| `GET` | `/prompt/versions` | List prompt version snapshots |
+| `GET` | `/prompt/{date}` | Get a specific prompt version |
 
 ## Deployment
 
@@ -694,6 +712,7 @@ tos-monitor/
 │   │   ├── fetch_docs.py    # Document fetching
 │   │   ├── tos.py           # ToS management
 │   │   ├── config.py        # Document configuration
+│   │   ├── prompt.py        # Prompt management
 │   │   └── ui.py            # Web UI routes
 │   ├── clients/             # AI implementations
 │   │   ├── base.py
@@ -703,7 +722,8 @@ tos-monitor/
 │   ├── templates/           # Jinja2 templates
 │   │   ├── base.html
 │   │   ├── dashboard.html
-│   │   └── document.html
+│   │   ├── document.html
+│   │   └── prompt.html
 │   └── utils/               # Utilities
 │       ├── html_parser.py
 │       ├── normalizer.py

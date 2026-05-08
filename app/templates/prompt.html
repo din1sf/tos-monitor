@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Prompt Template - ToS Monitor{% endblock %}
+
+{% block content %}
+<div class="mb-1">
+    <a href="/ui" class="text-muted" style="text-decoration:none;">&larr; Dashboard</a>
+</div>
+
+<div class="flex-between mb-1">
+    <h1>Prompt Template</h1>
+    <div class="flex gap-sm">
+        <input type="file" id="file-input" accept=".txt,.md" style="display:none;">
+        <button class="btn" onclick="document.getElementById('file-input').click()">Upload</button>
+        <button class="btn" onclick="downloadPrompt()">Download</button>
+        <button class="btn btn-primary" id="save-btn" onclick="savePrompt()">Save</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="flex-between mb-1">
+        <div class="flex gap-sm">
+            <button class="btn tab-btn active" id="tab-edit" onclick="switchTab('edit')">Edit</button>
+            <button class="btn tab-btn" id="tab-preview" onclick="switchTab('preview')">Preview</button>
+        </div>
+        <span class="text-muted" id="status-label">Current prompt</span>
+    </div>
+    <textarea id="prompt-editor"
+        style="width:100%; min-height:500px; font-family:'SF Mono','Consolas',monospace; font-size:0.85rem;
+               line-height:1.6; padding:1rem; border:1px solid var(--border); border-radius:var(--radius);
+               background:var(--bg); color:var(--text); resize:vertical; tab-size:4;"
+    >{{ prompt_content }}</textarea>
+    <div id="prompt-preview" class="content-preview" style="display:none; min-height:500px;"></div>
+</div>
+
+<div class="card mt-1">
+    <div class="flex-between" style="cursor:pointer;" onclick="toggleHistory()">
+        <h2>Version History</h2>
+        <span class="text-muted" id="history-toggle">{{ versions|length }} version{{ 's' if versions|length != 1 }} &darr;</span>
+    </div>
+    <div id="history-panel" style="display:none;">
+        <div class="mt-1 flex gap-sm" style="flex-wrap:wrap;" id="version-chips">
+            {% for date in versions %}
+            <span class="chip" onclick="loadVersion('{{ date }}', this)">{{ date }}</span>
+            {% endfor %}
+            {% if not versions %}
+            <span class="text-muted">No previous versions yet. Versions are created when you save changes.</span>
+            {% endif %}
+        </div>
+        <div id="version-preview-container" class="mt-1" style="display:none;">
+            <div class="flex-between mb-1">
+                <span class="text-muted" id="version-label"></span>
+                <button class="btn" onclick="restoreVersion()">Restore This Version</button>
+            </div>
+            <pre class="content-preview" id="version-content" style="max-height:300px;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .tab-btn { border-bottom: 2px solid transparent; border-radius: var(--radius) var(--radius) 0 0; }
+    .tab-btn.active { border-bottom-color: var(--primary); color: var(--primary); }
+</style>
+<script>
+    const editor = document.getElementById('prompt-editor');
+    const preview = document.getElementById('prompt-preview');
+    const fileInput = document.getElementById('file-input');
+    let loadedVersionContent = '';
+
+    function switchTab(tab) {
+        const editTab = document.getElementById('tab-edit');
+        const previewTab = document.getElementById('tab-preview');
+        if (tab === 'edit') {
+            editor.style.display = '';
+            preview.style.display = 'none';
+            editTab.classList.add('active');
+            previewTab.classList.remove('active');
+        } else {
+            editor.style.display = 'none';
+            preview.style.display = '';
+            editTab.classList.remove('active');
+            previewTab.classList.add('active');
+            renderPreview();
+        }
+    }
+
+    function renderPreview() {
+        const text = editor.value;
+        const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const highlighted = escaped.replace(
+            /\{(\w+)\}/g,
+            '<span style="background:#e7f1ff;color:var(--primary);padding:0.1rem 0.3rem;border-radius:3px;font-weight:600;">{$1}</span>'
+        );
+        preview.innerHTML = highlighted;
+    }
+
+    async function savePrompt() {
+        const btn = document.getElementById('save-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Saving...';
+        try {
+            await apiFetch('/prompt', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'text/plain' },
+                body: editor.value
+            });
+            showToast('Prompt saved');
+            document.getElementById('status-label').textContent = 'Saved';
+            setTimeout(() => location.reload(), 1000);
+        } catch (e) {
+            showToast('Save failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save';
+        }
+    }
+
+    function downloadPrompt() {
+        const blob = new Blob([editor.value], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'prompt.txt';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            editor.value = e.target.result;
+            document.getElementById('status-label').textContent = 'Uploaded: ' + file.name + ' (unsaved)';
+            switchTab('edit');
+            showToast('File loaded into editor. Click Save to persist.');
+        };
+        reader.readAsText(file);
+        this.value = '';
+    });
+
+    function toggleHistory() {
+        const panel = document.getElementById('history-panel');
+        const toggle = document.getElementById('history-toggle');
+        if (panel.style.display === 'none') {
+            panel.style.display = '';
+            toggle.innerHTML = toggle.innerHTML.replace('↓', '↑');
+        } else {
+            panel.style.display = 'none';
+            toggle.innerHTML = toggle.innerHTML.replace('↑', '↓');
+        }
+    }
+
+    async function loadVersion(date, chipEl) {
+        document.querySelectorAll('#version-chips .chip').forEach(c => c.classList.remove('active'));
+        if (chipEl) chipEl.classList.add('active');
+
+        const container = document.getElementById('version-preview-container');
+        const content = document.getElementById('version-content');
+        const label = document.getElementById('version-label');
+
+        container.style.display = '';
+        content.textContent = 'Loading...';
+        label.textContent = 'Version: ' + date;
+
+        try {
+            const res = await apiFetch('/prompt/' + date);
+            loadedVersionContent = await res.text();
+            content.textContent = loadedVersionContent;
+        } catch (e) {
+            content.textContent = 'Error: ' + e.message;
+            loadedVersionContent = '';
+        }
+    }
+
+    function restoreVersion() {
+        if (!loadedVersionContent) return;
+        editor.value = loadedVersionContent;
+        switchTab('edit');
+        document.getElementById('status-label').textContent = 'Restored version (unsaved)';
+        showToast('Version restored into editor. Click Save to persist.');
+    }
+
+    editor.addEventListener('input', function() {
+        document.getElementById('status-label').textContent = 'Edited (unsaved)';
+    });
+</script>
+{% endblock %}
