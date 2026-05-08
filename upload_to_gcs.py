@@ -49,16 +49,18 @@ except ImportError:
 class ToSDataUploader:
     """Uploads ToS Monitor data to Google Cloud Storage."""
 
-    def __init__(self, bucket_name: str, data_dir: str = "data"):
+    def __init__(self, bucket_name: str, data_dir: str = "data", config_only: bool = False):
         """
         Initialize the uploader.
 
         Args:
             bucket_name: Name of the GCS bucket
             data_dir: Local data directory path (default: "data")
+            config_only: If True, only upload config files (skip tos/ folder)
         """
         self.bucket_name = bucket_name
         self.data_dir = Path(data_dir)
+        self.config_only = config_only
         self.client = storage.Client()
         self.bucket = self.client.bucket(bucket_name)
 
@@ -97,6 +99,10 @@ class ToSDataUploader:
         # Walk through all files in the data directory
         for root, dirs, files in os.walk(self.data_dir):
             root_path = Path(root)
+
+            # If config_only mode, skip tos/ subdirectory
+            if self.config_only and 'tos' in dirs:
+                dirs.remove('tos')
 
             for file in files:
                 local_file_path = root_path / file
@@ -198,7 +204,8 @@ class ToSDataUploader:
             print(f"No files found in {self.data_dir}")
             return True
 
-        print(f"\nFound {len(files_to_upload)} files to upload:")
+        mode_desc = " (config files only)" if self.config_only else ""
+        print(f"\nFound {len(files_to_upload)} files to upload{mode_desc}:")
         if dry_run:
             print("Running in DRY RUN mode - no actual uploads will be performed\n")
         else:
@@ -267,17 +274,24 @@ Note:
         help="Show what would be uploaded without actually uploading"
     )
 
+    parser.add_argument(
+        "--config-only",
+        action="store_true",
+        help="Upload config files only (documents.json, prompt.txt), skip tos/ folder"
+    )
+
     args = parser.parse_args()
 
     print("🚀 ToS Monitor Data Uploader")
     print("=" * 40)
     print(f"Source directory: {args.data_dir}")
     print(f"Target bucket: gs://{args.bucket}")
+    print(f"Mode: {'Config only' if args.config_only else 'All data'}")
     print(f"Dry run: {args.dry_run}")
     print()
 
     try:
-        uploader = ToSDataUploader(args.bucket, args.data_dir)
+        uploader = ToSDataUploader(args.bucket, args.data_dir, config_only=args.config_only)
         success = uploader.upload_all(dry_run=args.dry_run)
 
         if success:

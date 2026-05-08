@@ -13,6 +13,7 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 - 🏗️ **Serverless Architecture**: Scales to zero when not in use, cost-effective operation
 - 🔄 **Version Management**: Maintains current, last, and previous versions with dated snapshots
 - 🔧 **Pluggable AI System**: Supports OpenAI, OpenRouter, Bosch LLM Farm, and easily extensible to other providers
+- 🚀 **Integrated Deployment**: Interactive deployment script with GCS upload, flexible data sync options
 
 ## Architecture
 
@@ -44,7 +45,8 @@ A serverless Terms of Service monitoring service that automatically tracks chang
 - [API Documentation](#api-documentation)
 - [Deployment](#deployment)
   - [Cloud Run Deployment](#cloud-run-deployment)
-  - [GCS Upload](#gcs-upload)
+  - [GCS Upload (Standalone)](#gcs-upload-standalone)
+  - [Manual Deployment](#manual-deployment)
 - [Testing](#testing)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
@@ -122,6 +124,8 @@ For other providers (OpenAI, OpenRouter), see [Configuration](#configuration).
 docker build -t tos-monitor .
 docker run -p 8080:8080 --env-file .env tos-monitor
 ```
+
+For cloud deployment to Google Cloud Run, see the [Deployment](#deployment) section which includes an integrated deployment script.
 
 ## Configuration
 
@@ -399,78 +403,184 @@ gcloud scheduler jobs create http tos-monitor-sync \
 
 ### Cloud Run Deployment
 
-The project includes an interactive menu-driven deployment script:
+The project includes an integrated deployment script that handles GCS data upload, image building, and Cloud Run deployment.
 
-**Interactive Deployment:**
+#### Prerequisites
+
 ```bash
-# Make sure you're authenticated
-gcloud auth login
-gcloud config set project your-project-id
+# Install GCS upload dependencies
+pip install google-cloud-storage
 
+# Authenticate with Google Cloud
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project your-project-id
+```
+
+#### Interactive Deployment
+
+```bash
 # Run interactive deployment
 ./deploy.sh
 ```
 
-This will guide you through:
-1. Select environment file (defaults to `.env.cloud`)
-2. Choose deployment mode (full/skip-build/dry-run)
-3. Select build method (Cloud Build or local Docker)
-4. Review and confirm
+The interactive menu guides you through:
 
-**Non-Interactive Mode (for CI/automation):**
+1. **Environment file selection**
+   - `.env.cloud` (recommended for production)
+   - `.env` (local/custom configuration)
+   - Custom path
+
+2. **Deployment mode**
+   - Full deployment (upload + build + deploy)
+   - Upload data only
+   - Build & deploy only (skip upload)
+   - Deploy only (skip upload & build)
+   - Dry run (preview only)
+
+3. **Data upload options** (when uploading)
+   - All data (config + tos/ snapshots) - 91 files
+   - Config only (documents.json, prompt.txt) - 2 files
+
+4. **Build method** (when building)
+   - Cloud Build (recommended)
+   - Local Docker
+
+5. **Review and confirm**
+
+#### Non-Interactive Deployment (CI/CD)
+
 ```bash
-# Deploy with specific env file
+# Full deployment with all data
 ./deploy.sh --env .env.cloud --skip-menu
 
-# Dry run with custom env
-./deploy.sh --env .env.production --skip-menu --dry-run
+# Deploy with config files only (no historical data)
+./deploy.sh --env .env.cloud --skip-menu --config-only
 
-# Deploy without rebuilding
-./deploy.sh --env .env.cloud --skip-menu --skip-build
+# Upload data only (no build/deploy)
+./deploy.sh --upload-only
 
-# Local Docker build
-./deploy.sh --env .env.cloud --skip-menu --local-build
+# Upload config files only
+./deploy.sh --upload-only --config-only
+
+# Deploy without uploading data
+./deploy.sh --skip-upload --skip-menu
+
+# Dry run to preview actions
+./deploy.sh --dry-run
+
+# Deploy without rebuilding image
+./deploy.sh --skip-build --skip-menu
+
+# Use local Docker build instead of Cloud Build
+./deploy.sh --local-build --skip-menu
 ```
 
-**Manual Deployment:**
+#### Deployment Flags Reference
+
+| Flag | Description |
+|------|-------------|
+| `--env FILE` | Use specific env file (implies --skip-menu) |
+| `--skip-menu` | Skip interactive menu |
+| `--dry-run` | Preview without deploying |
+| `--skip-build` | Deploy without rebuilding image |
+| `--local-build` | Use local Docker instead of Cloud Build |
+| `--skip-upload` | Skip GCS data upload entirely |
+| `--upload-only` | Only upload data to GCS, skip build/deploy |
+| `--config-only` | Upload config files only, skip tos/ folder |
+| `--skip-tos-data` | Same as --config-only |
+| `--data-dir DIR` | Custom data directory (default: data) |
+
+#### What Gets Uploaded to GCS
+
+**All data mode** (91 files):
+```
+gs://tos-monitor/
+├── documents.json          # Document configuration
+├── prompt.txt              # LLM analysis prompt
+└── tos/                    # Historical snapshots (89 files)
+    ├── anthropic/
+    ├── aws_tos/
+    ├── gcp_sla/
+    └── ...
+```
+
+**Config-only mode** (2 files):
+```
+gs://tos-monitor/
+├── documents.json          # Document configuration
+└── prompt.txt              # LLM analysis prompt
+```
+
+#### Use Cases
+
+**Fresh deployment:**
 ```bash
-# Build and push image
+# Deploy without historical data (app will generate new snapshots)
+./deploy.sh --config-only --skip-menu
+```
+
+**Update configuration only:**
+```bash
+# Update config files without redeploying the app
+./deploy.sh --upload-only --config-only
+```
+
+**Full production deployment:**
+```bash
+# Deploy everything: data + new image + Cloud Run service
+./deploy.sh --skip-menu
+```
+
+**CI/CD pipeline:**
+```bash
+# Automated deployment with preview
+./deploy.sh --env .env.cloud --skip-menu --dry-run  # Review
+./deploy.sh --env .env.cloud --skip-menu            # Deploy
+```
+
+### GCS Upload (Standalone)
+
+You can also use the upload script independently:
+
+```bash
+# Preview what will be uploaded
+python upload_to_gcs.py --bucket tos-monitor --dry-run
+
+# Upload all data (91 files)
+python upload_to_gcs.py --bucket tos-monitor
+
+# Upload config files only (2 files)
+python upload_to_gcs.py --bucket tos-monitor --config-only
+
+# Custom data directory
+python upload_to_gcs.py --bucket tos-monitor --data-dir /path/to/data
+```
+
+### Manual Deployment
+
+If you prefer manual control:
+
+```bash
+# 1. Upload data to GCS
+python upload_to_gcs.py --bucket tos-monitor
+
+# 2. Build and push image
 gcloud builds submit --tag gcr.io/$GOOGLE_CLOUD_PROJECT/tos-monitor
 
-# Deploy to Cloud Run
+# 3. Deploy to Cloud Run
 gcloud run deploy tos-monitor \
     --image gcr.io/$GOOGLE_CLOUD_PROJECT/tos-monitor \
     --platform managed \
-    --region us-central1 \
-    --allow-unauthenticated
+    --region europe-west3 \
+    --allow-unauthenticated \
+    --set-env-vars="STORAGE_MODE=cloud,STORAGE_BUCKET=tos-monitor,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT"
 ```
 
 **Set Environment Variables:**
 ```bash
 gcloud run services update tos-monitor \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,STORAGE_BUCKET=$BUCKET_NAME,AI_PROVIDER=openrouter" \
-    --set-secrets="OPENROUTER_API_KEY=openrouter-key:latest"
-```
-
-### GCS Upload
-
-Upload local data to Google Cloud Storage:
-
-```bash
-# Install dependencies
-pip install google-cloud-storage
-
-# Authenticate
-gcloud auth application-default login
-
-# Dry run (preview)
-python upload_to_gcs.py --bucket tos-monitor --dry-run
-
-# Upload
-python upload_to_gcs.py --bucket tos-monitor
-
-# Custom data directory
-python upload_to_gcs.py --bucket tos-monitor --data-dir /path/to/data
+    --set-env-vars="AI_PROVIDER=bosch-llm-farm,ANTHROPIC_AUTH_TOKEN=$TOKEN,BOSCH_LLM_MODEL=claude-sonnet-4-5@20250929"
 ```
 
 ## Testing

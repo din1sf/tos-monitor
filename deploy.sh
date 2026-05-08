@@ -15,6 +15,10 @@ SKIP_MENU=false
 DRY_RUN=false
 SKIP_BUILD=false
 USE_LOCAL_BUILD=false
+SKIP_UPLOAD=false
+UPLOAD_ONLY=false
+SKIP_TOS_DATA=false
+DATA_DIR="data"
 ENV_FILE=""
 
 # Print functions
@@ -37,14 +41,24 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN=true; shift ;;
         --skip-build) SKIP_BUILD=true; shift ;;
         --local-build) USE_LOCAL_BUILD=true; shift ;;
+        --skip-upload) SKIP_UPLOAD=true; shift ;;
+        --upload-only) UPLOAD_ONLY=true; SKIP_MENU=true; shift ;;
+        --skip-tos-data) SKIP_TOS_DATA=true; shift ;;
+        --config-only) SKIP_TOS_DATA=true; shift ;;
+        --data-dir) DATA_DIR="$2"; shift 2 ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
-            echo "  --env FILE       Use specific env file (implies --skip-menu)"
-            echo "  --skip-menu      Skip interactive menu"
-            echo "  --dry-run        Preview without deploying"
-            echo "  --skip-build     Deploy without rebuilding image"
-            echo "  --local-build    Use local Docker instead of Cloud Build"
+            echo "  --env FILE         Use specific env file (implies --skip-menu)"
+            echo "  --skip-menu        Skip interactive menu"
+            echo "  --dry-run          Preview without deploying"
+            echo "  --skip-build       Deploy without rebuilding image"
+            echo "  --local-build      Use local Docker instead of Cloud Build"
+            echo "  --skip-upload      Skip GCS data upload entirely"
+            echo "  --upload-only      Only upload data to GCS, skip build/deploy"
+            echo "  --skip-tos-data    Upload config files only, skip tos/ folder"
+            echo "  --config-only      Same as --skip-tos-data"
+            echo "  --data-dir DIR     Custom data directory (default: data)"
             exit 0
             ;;
         *) print_error "Unknown option: $1"; exit 1 ;;
@@ -61,6 +75,20 @@ check_prerequisites() {
     if [[ "$USE_LOCAL_BUILD" == true ]] && ! command -v docker &> /dev/null; then
         print_error "Docker not found but --local-build specified"
         exit 1
+    fi
+
+    # Check Python3 and google-cloud-storage for upload functionality
+    if [[ "$SKIP_UPLOAD" == false || "$UPLOAD_ONLY" == true ]]; then
+        if ! command -v python3 &> /dev/null; then
+            print_error "python3 not found. Required for GCS upload."
+            exit 1
+        fi
+
+        if ! python3 -c "import google.cloud.storage" &> /dev/null; then
+            print_error "google-cloud-storage package not found."
+            print_info "Install with: pip3 install google-cloud-storage"
+            exit 1
+        fi
     fi
 
     print_success "Prerequisites check passed"
@@ -103,18 +131,22 @@ select_env_file() {
 # Interactive menu for deployment mode
 select_deployment_mode() {
     echo -e "\n${CYAN}Deployment mode:${NC}"
-    echo -e "  ${GREEN}[1]${NC} Full deployment (build + deploy)"
-    echo -e "  [2] Deploy only (skip build)"
-    echo -e "  [3] Dry run (preview only)"
+    echo -e "  ${GREEN}[1]${NC} Full deployment (upload + build + deploy)"
+    echo -e "  [2] Upload data only"
+    echo -e "  [3] Build & deploy only (skip upload)"
+    echo -e "  [4] Deploy only (skip upload & build)"
+    echo -e "  [5] Dry run (preview only)"
 
     echo -en "\n${CYAN}Choice [1]:${NC} "
     read -r choice
     choice=${choice:-1}
 
     case $choice in
-        1) SKIP_BUILD=false; DRY_RUN=false ;;
-        2) SKIP_BUILD=true; DRY_RUN=false ;;
-        3) DRY_RUN=true ;;
+        1) SKIP_UPLOAD=false; SKIP_BUILD=false; DRY_RUN=false; UPLOAD_ONLY=false ;;
+        2) SKIP_UPLOAD=false; SKIP_BUILD=true; DRY_RUN=false; UPLOAD_ONLY=true ;;
+        3) SKIP_UPLOAD=true; SKIP_BUILD=false; DRY_RUN=false; UPLOAD_ONLY=false ;;
+        4) SKIP_UPLOAD=true; SKIP_BUILD=true; DRY_RUN=false; UPLOAD_ONLY=false ;;
+        5) DRY_RUN=true; UPLOAD_ONLY=false ;;
         *) print_error "Invalid choice"; exit 1 ;;
     esac
 }
@@ -134,6 +166,25 @@ select_build_method() {
     case $choice in
         1) USE_LOCAL_BUILD=false ;;
         2) USE_LOCAL_BUILD=true ;;
+        *) print_error "Invalid choice"; exit 1 ;;
+    esac
+}
+
+# Interactive menu for data upload options
+select_upload_options() {
+    [[ "$SKIP_UPLOAD" == true ]] && return
+
+    echo -e "\n${CYAN}Data to upload:${NC}"
+    echo -e "  ${GREEN}[1]${NC} All data (config + tos/ snapshots)"
+    echo -e "  [2] Config only (documents.json, prompt.txt)"
+
+    echo -en "\n${CYAN}Choice [1]:${NC} "
+    read -r choice
+    choice=${choice:-1}
+
+    case $choice in
+        1) SKIP_TOS_DATA=false ;;
+        2) SKIP_TOS_DATA=true ;;
         *) print_error "Invalid choice"; exit 1 ;;
     esac
 }
@@ -165,6 +216,13 @@ load_env_file() {
     CLOUD_RUN_REGION=${CLOUD_RUN_REGION:-europe-west3}
     SERVICE_NAME=${SERVICE_NAME:-tos-monitor}
 
+    # Warn if STORAGE_MODE=cloud but no data directory
+    if [[ "$STORAGE_MODE" == "cloud" && "$SKIP_UPLOAD" == false && ! -d "$DATA_DIR" ]]; then
+        print_warning "STORAGE_MODE=cloud but data directory not found: $DATA_DIR"
+        print_info "Data upload will be skipped"
+        SKIP_UPLOAD=true
+    fi
+
     print_success "Environment loaded"
 }
 
@@ -175,8 +233,21 @@ show_summary() {
     echo -e "  • Project:      $GOOGLE_CLOUD_PROJECT"
     echo -e "  • Service:      $SERVICE_NAME"
     echo -e "  • Region:       $CLOUD_RUN_REGION"
-    echo -e "  • Mode:         $([ "$DRY_RUN" = true ] && echo "Dry run" || echo "Deploy")"
-    [[ "$SKIP_BUILD" == false ]] && echo -e "  • Build:        $([ "$USE_LOCAL_BUILD" = true ] && echo "Local Docker" || echo "Cloud Build")"
+    echo -e "  • Mode:         $([ "$DRY_RUN" = true ] && echo "Dry run" || [ "$UPLOAD_ONLY" = true ] && echo "Upload only" || echo "Deploy")"
+
+    # Show upload info
+    if [[ "$STORAGE_MODE" == "cloud" && "$SKIP_UPLOAD" == false ]]; then
+        if [[ "$SKIP_TOS_DATA" == true ]]; then
+            echo -e "  • Upload:       $DATA_DIR/ → gs://$STORAGE_BUCKET ${YELLOW}(config only)${NC}"
+        else
+            echo -e "  • Upload:       $DATA_DIR/ → gs://$STORAGE_BUCKET ${GREEN}(all data)${NC}"
+        fi
+    elif [[ "$STORAGE_MODE" == "cloud" && "$SKIP_UPLOAD" == true ]]; then
+        echo -e "  • Upload:       ${YELLOW}Skipped${NC}"
+    fi
+
+    # Show build info
+    [[ "$SKIP_BUILD" == false && "$UPLOAD_ONLY" == false ]] && echo -e "  • Build:        $([ "$USE_LOCAL_BUILD" = true ] && echo "Local Docker" || echo "Cloud Build")"
 
     if [[ "$DRY_RUN" == false && "$SKIP_MENU" == false ]]; then
         echo -en "\n${CYAN}Continue? [Y/n]:${NC} "
@@ -212,6 +283,49 @@ build_image() {
     fi
 
     print_success "Image built and pushed"
+}
+
+# Upload data to GCS
+upload_data_to_gcs() {
+    [[ "$SKIP_UPLOAD" == true ]] && return
+
+    # Only upload if STORAGE_MODE=cloud
+    if [[ "$STORAGE_MODE" != "cloud" ]]; then
+        print_info "Skipping upload (STORAGE_MODE=$STORAGE_MODE)"
+        return
+    fi
+
+    if [[ ! -d "$DATA_DIR" ]]; then
+        print_warning "Data directory not found: $DATA_DIR"
+        print_info "Skipping GCS upload"
+        return
+    fi
+
+    # Build upload command
+    local upload_cmd="python3 upload_to_gcs.py --bucket $STORAGE_BUCKET --data-dir $DATA_DIR"
+    [[ "$SKIP_TOS_DATA" == true ]] && upload_cmd="$upload_cmd --config-only"
+    [[ "$DRY_RUN" == true ]] && upload_cmd="$upload_cmd --dry-run"
+
+    if [[ "$DRY_RUN" == true ]]; then
+        if [[ "$SKIP_TOS_DATA" == true ]]; then
+            print_info "Would upload config files only to gs://$STORAGE_BUCKET"
+        else
+            print_info "Would upload all data to gs://$STORAGE_BUCKET"
+        fi
+    else
+        if [[ "$SKIP_TOS_DATA" == true ]]; then
+            print_info "Uploading config files to GCS bucket: $STORAGE_BUCKET"
+        else
+            print_info "Uploading all data to GCS bucket: $STORAGE_BUCKET"
+        fi
+    fi
+
+    eval "$upload_cmd" || {
+        print_error "Data upload failed"
+        exit 1
+    }
+
+    [[ "$DRY_RUN" == false ]] && print_success "Data uploaded to GCS"
 }
 
 # Deploy to Cloud Run
@@ -317,6 +431,7 @@ main() {
     if [[ "$SKIP_MENU" == false ]]; then
         [[ -z "$ENV_FILE" ]] && select_env_file
         select_deployment_mode
+        select_upload_options
         select_build_method
     else
         # Non-interactive: use defaults if not specified
@@ -325,6 +440,17 @@ main() {
 
     load_env_file
     show_summary
+
+    # Upload data to GCS
+    upload_data_to_gcs
+
+    # If upload-only mode, exit here
+    if [[ "$UPLOAD_ONLY" == true ]]; then
+        echo -e "\n${GREEN}Upload complete!${NC}\n"
+        exit 0
+    fi
+
+    # Build and deploy
     build_image
     deploy_service
 
