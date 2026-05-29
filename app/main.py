@@ -63,11 +63,13 @@ async def root():
     """
     Root endpoint with service information.
     """
+    ai_provider = os.getenv("AI_PROVIDER", "openai").lower()
     return {
         "service": "ToS Monitor",
         "description": "Terms of Service monitoring service",
         "version": os.getenv("APP_VERSION", "1.0.0"),
         "status": "healthy",
+        "ai_provider": ai_provider,
         "timestamp": datetime.utcnow().isoformat(),
         "endpoints": {
             "sync": "POST /sync - Download and store legal documents",
